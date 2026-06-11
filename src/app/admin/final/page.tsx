@@ -3,18 +3,18 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { getTeamDisplayName } from '@/lib/teamMeta'
-
+import TeamSelector from '@/components/TeamSelector'
+import { getTeamFlag } from '@/lib/teamMeta'
 
 export default function AdminFinalPage() {
   const router = useRouter()
   const [authorized, setAuthorized] = useState(false)
+  const [teams, setTeams] = useState<string[]>([])
   const [champion, setChampion] = useState('')
   const [runnerUp, setRunnerUp] = useState('')
   const [thirdPlace, setThirdPlace] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
-  const [teams, setTeams] = useState<string[]>([])
 
   useEffect(() => {
     checkAdmin()
@@ -113,74 +113,79 @@ export default function AdminFinalPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-2 text-3xl font-black text-white">Resultado Final del Mundial</h1>
-      <p className="mb-6 text-slate-300">
-        Carga el campeón, subcampeón y tercer lugar real para asignar puntos extra.
-      </p>
+    <main className="mx-auto max-w-4xl px-4 py-10">
+      <section className="mb-6 rounded-3xl border border-white/10 bg-gradient-to-br from-blue-900/70 to-slate-900/80 p-6 shadow-2xl">
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-cyan-300">
+          Panel Admin
+        </p>
+        <h1 className="text-3xl font-black text-white md:text-5xl">
+          Resultado Final del Mundial
+        </h1>
+        <p className="mt-2 text-slate-200">
+          Carga el resultado final real para asignar automáticamente los puntos extra.
+        </p>
+      </section>
 
       <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">
-              Campeón real
-            </label>
-            <select
-              className="w-full rounded-xl p-3"
-              value={champion}
-              onChange={(e) => setChampion(e.target.value)}
-              required
-            >
-              <option value="">Selecciona campeón</option>
-              {teams.map((team) => (
-                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <TeamSelector
+            label="Campeón real"
+            pointsLabel="+55 puntos"
+            value={champion}
+            teams={teams}
+            onChange={setChampion}
+            placeholder="Selecciona campeón"
+          />
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">
-              Subcampeón real
-            </label>
-            <select
-              className="w-full rounded-xl p-3"
-              value={runnerUp}
-              onChange={(e) => setRunnerUp(e.target.value)}
-              required
-            >
-              <option value="">Selecciona subcampeón</option>
-              {teams.map((team) => (
-                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
-              ))}
-            </select>
-          </div>
+          <TeamSelector
+            label="Subcampeón real"
+            pointsLabel="+30 puntos"
+            value={runnerUp}
+            teams={teams}
+            onChange={setRunnerUp}
+            placeholder="Selecciona subcampeón"
+          />
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">
-              Tercer lugar real
-            </label>
-            <select
-              className="w-full rounded-xl p-3"
-              value={thirdPlace}
-              onChange={(e) => setThirdPlace(e.target.value)}
-              required
-            >
-              <option value="">Selecciona tercer lugar</option>
-              {teams.map((team) => (
-                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
-              ))}
-            </select>
-          </div>
+          <TeamSelector
+            label="Tercer lugar real"
+            pointsLabel="+25 puntos"
+            value={thirdPlace}
+            teams={teams}
+            onChange={setThirdPlace}
+            placeholder="Selecciona tercer lugar"
+          />
+
+          {champion && runnerUp && thirdPlace && (
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+                Resultado a aplicar
+              </p>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-slate-950/40 p-3">
+                  <p className="text-sm text-slate-400">Campeón</p>
+                  <p className="font-black">{getTeamFlag(champion)} {champion}</p>
+                </div>
+                <div className="rounded-xl bg-slate-950/40 p-3">
+                  <p className="text-sm text-slate-400">Subcampeón</p>
+                  <p className="font-black">{getTeamFlag(runnerUp)} {runnerUp}</p>
+                </div>
+                <div className="rounded-xl bg-slate-950/40 p-3">
+                  <p className="text-sm text-slate-400">Tercer lugar</p>
+                  <p className="font-black">{getTeamFlag(thirdPlace)} {thirdPlace}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {message && (
-            <div className="rounded-xl bg-white/10 p-3 text-sm text-slate-100">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-50">
               {message}
             </div>
           )}
 
           <button
             disabled={saving}
-            className="w-full rounded-xl bg-cyan-400 p-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
+            className="w-full rounded-2xl bg-cyan-400 p-4 font-black text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
           >
             {saving ? 'Recalculando...' : 'Guardar resultado final'}
           </button>

@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { getTeamDisplayName } from '@/lib/teamMeta'
+import TeamSelector from '@/components/TeamSelector'
+import { getTeamFlag } from '@/lib/teamMeta'
 
 type FinalPrediction = {
   champion: string | null
@@ -14,10 +15,10 @@ type FinalPrediction = {
   third_place_points: number
 }
 
-
 export default function FinalPredictionPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
+  const [teams, setTeams] = useState<string[]>([])
   const [champion, setChampion] = useState('')
   const [runnerUp, setRunnerUp] = useState('')
   const [thirdPlace, setThirdPlace] = useState('')
@@ -25,7 +26,6 @@ export default function FinalPredictionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentPrediction, setCurrentPrediction] = useState<FinalPrediction | null>(null)
-  const [teams, setTeams] = useState<string[]>([])
 
   useEffect(() => {
     loadData()
@@ -116,83 +116,66 @@ export default function FinalPredictionPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="mx-auto max-w-4xl px-4 py-10">
         <div className="rounded-3xl border border-white/10 bg-white/10 p-6">
-          Cargando...
+          Cargando predicción final...
         </div>
       </main>
     )
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-2 text-3xl font-black text-white">Predicción Final</h1>
-      <p className="mb-6 text-slate-300">
-        Elige tu campeón, subcampeón y tercer lugar del Mundial 2026.
-      </p>
+    <main className="mx-auto max-w-4xl px-4 py-10">
+      <section className="mb-6 rounded-3xl border border-white/10 bg-gradient-to-br from-blue-900/70 to-slate-900/80 p-6 shadow-2xl">
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-cyan-300">
+          Mundial 2026
+        </p>
+        <h1 className="text-3xl font-black text-white md:text-5xl">
+          Predicción Final
+        </h1>
+        <p className="mt-2 text-slate-200">
+          Elige tu campeón, subcampeón y tercer lugar. Estos puntos pueden cambiar todo el ranking.
+        </p>
+      </section>
 
       <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">
-              Campeón +55 puntos
-            </label>
-            <select
-              className="w-full rounded-xl p-3"
-              value={champion}
-              onChange={(e) => setChampion(e.target.value)}
-              required
-            >
-              <option value="">Selecciona campeón</option>
-              {teams.map((team) => (
-                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <TeamSelector
+            label="Campeón"
+            pointsLabel="+55 puntos"
+            value={champion}
+            teams={teams}
+            onChange={setChampion}
+            placeholder="Selecciona campeón"
+          />
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">
-              Subcampeón +30 puntos
-            </label>
-            <select
-              className="w-full rounded-xl p-3"
-              value={runnerUp}
-              onChange={(e) => setRunnerUp(e.target.value)}
-              required
-            >
-              <option value="">Selecciona subcampeón</option>
-              {teams.map((team) => (
-                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
-              ))}
-            </select>
-          </div>
+          <TeamSelector
+            label="Subcampeón"
+            pointsLabel="+30 puntos"
+            value={runnerUp}
+            teams={teams}
+            onChange={setRunnerUp}
+            placeholder="Selecciona subcampeón"
+          />
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">
-              Tercer lugar +25 puntos
-            </label>
-            <select
-              className="w-full rounded-xl p-3"
-              value={thirdPlace}
-              onChange={(e) => setThirdPlace(e.target.value)}
-              required
-            >
-              <option value="">Selecciona tercer lugar</option>
-              {teams.map((team) => (
-                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
-              ))}
-            </select>
-          </div>
+          <TeamSelector
+            label="Tercer lugar"
+            pointsLabel="+25 puntos"
+            value={thirdPlace}
+            teams={teams}
+            onChange={setThirdPlace}
+            placeholder="Selecciona tercer lugar"
+          />
 
           {message && (
-            <div className="rounded-xl bg-white/10 p-3 text-sm text-slate-100">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-50">
               {message}
             </div>
           )}
 
           <button
             disabled={saving}
-            className="w-full rounded-xl bg-cyan-400 p-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
+            className="w-full rounded-2xl bg-cyan-400 p-4 font-black text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
           >
             {saving ? 'Guardando...' : 'Guardar predicción final'}
           </button>
@@ -201,14 +184,31 @@ export default function FinalPredictionPage() {
 
       {currentPrediction && (
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-6">
-          <h2 className="mb-4 text-xl font-bold">Tu predicción actual</h2>
-          <div className="space-y-2 text-slate-200">
-            <p>Campeón: <b>{currentPrediction.champion}</b></p>
-            <p>Subcampeón: <b>{currentPrediction.runner_up}</b></p>
-            <p>Tercer lugar: <b>{currentPrediction.third_place}</b></p>
-            <p className="pt-2 text-sm text-slate-300">
-              Puntos actuales: campeón {currentPrediction.champion_points}, subcampeón {currentPrediction.runner_up_points}, tercer lugar {currentPrediction.third_place_points}
-            </p>
+          <h2 className="mb-4 text-xl font-black">Tu predicción actual</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl bg-white/10 p-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400">Campeón</p>
+              <p className="mt-2 text-lg font-black">
+                {getTeamFlag(currentPrediction.champion || '')} {currentPrediction.champion}
+              </p>
+              <p className="mt-1 text-sm text-cyan-200">{currentPrediction.champion_points} puntos</p>
+            </div>
+
+            <div className="rounded-2xl bg-white/10 p-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400">Subcampeón</p>
+              <p className="mt-2 text-lg font-black">
+                {getTeamFlag(currentPrediction.runner_up || '')} {currentPrediction.runner_up}
+              </p>
+              <p className="mt-1 text-sm text-cyan-200">{currentPrediction.runner_up_points} puntos</p>
+            </div>
+
+            <div className="rounded-2xl bg-white/10 p-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400">Tercer lugar</p>
+              <p className="mt-2 text-lg font-black">
+                {getTeamFlag(currentPrediction.third_place || '')} {currentPrediction.third_place}
+              </p>
+              <p className="mt-1 text-sm text-cyan-200">{currentPrediction.third_place_points} puntos</p>
+            </div>
           </div>
         </div>
       )}
