@@ -4,49 +4,6 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-const teams = [
-  'México',
-  'Sudáfrica',
-  'Corea del Sur',
-  'Chequia',
-  'Canadá',
-  'Bosnia y Herzegovina',
-  'Estados Unidos',
-  'Paraguay',
-  'Haití',
-  'Escocia',
-  'Australia',
-  'Türkiye',
-  'Brasil',
-  'Marruecos',
-  'Qatar',
-  'Suiza',
-  'Alemania',
-  'Curazao',
-  'Países Bajos',
-  'Japón',
-  'Costa de Marfil',
-  'Ecuador',
-  'Túnez',
-  'Nueva Zelanda',
-  'Bélgica',
-  'Egipto',
-  'España',
-  'Cabo Verde',
-  'Irán',
-  'Uzbekistán',
-  'Arabia Saudita',
-  'Uruguay',
-  'Argentina',
-  'Francia',
-  'Portugal',
-  'Inglaterra',
-  'Colombia',
-  'Croacia',
-  'Dinamarca',
-  'Senegal',
-  'Perú',
-]
 
 export default function AdminFinalPage() {
   const router = useRouter()
@@ -56,6 +13,7 @@ export default function AdminFinalPage() {
   const [thirdPlace, setThirdPlace] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [teams, setTeams] = useState<string[]>([])
 
   useEffect(() => {
     checkAdmin()
@@ -81,6 +39,20 @@ export default function AdminFinalPage() {
     }
 
     setAuthorized(true)
+
+    const { data: matchesData } = await supabase
+      .from('matches')
+      .select('home_team, away_team')
+
+    const uniqueTeams = Array.from(
+      new Set(
+        (matchesData || [])
+          .flatMap((match) => [match.home_team, match.away_team])
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+
+    setTeams(uniqueTeams)
   }
 
   async function handleSubmit(e: FormEvent) {

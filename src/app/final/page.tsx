@@ -13,49 +13,6 @@ type FinalPrediction = {
   third_place_points: number
 }
 
-const teams = [
-  'México',
-  'Sudáfrica',
-  'Corea del Sur',
-  'Chequia',
-  'Canadá',
-  'Bosnia y Herzegovina',
-  'Estados Unidos',
-  'Paraguay',
-  'Haití',
-  'Escocia',
-  'Australia',
-  'Türkiye',
-  'Brasil',
-  'Marruecos',
-  'Qatar',
-  'Suiza',
-  'Alemania',
-  'Curazao',
-  'Países Bajos',
-  'Japón',
-  'Costa de Marfil',
-  'Ecuador',
-  'Túnez',
-  'Nueva Zelanda',
-  'Bélgica',
-  'Egipto',
-  'España',
-  'Cabo Verde',
-  'Irán',
-  'Uzbekistán',
-  'Arabia Saudita',
-  'Uruguay',
-  'Argentina',
-  'Francia',
-  'Portugal',
-  'Inglaterra',
-  'Colombia',
-  'Croacia',
-  'Dinamarca',
-  'Senegal',
-  'Perú',
-]
 
 export default function FinalPredictionPage() {
   const router = useRouter()
@@ -67,6 +24,7 @@ export default function FinalPredictionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentPrediction, setCurrentPrediction] = useState<FinalPrediction | null>(null)
+  const [teams, setTeams] = useState<string[]>([])
 
   useEffect(() => {
     loadData()
@@ -82,6 +40,20 @@ export default function FinalPredictionPage() {
 
     const uid = sessionData.session.user.id
     setUserId(uid)
+
+    const { data: matchesData } = await supabase
+      .from('matches')
+      .select('home_team, away_team')
+
+    const uniqueTeams = Array.from(
+      new Set(
+        (matchesData || [])
+          .flatMap((match) => [match.home_team, match.away_team])
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+
+    setTeams(uniqueTeams)
 
     const { data } = await supabase
       .from('final_predictions')
