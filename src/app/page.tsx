@@ -17,7 +17,7 @@ export default function Home() {
           en tiempo real según las reglas de puntaje del torneo.
         </p>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Link href="/register" className="rounded-xl bg-cyan-400 px-5 py-3 text-center font-bold text-slate-950 hover:bg-cyan-300">
             Registrarme
           </Link>
@@ -26,6 +26,9 @@ export default function Home() {
           </Link>
           <Link href="/fixture" className="rounded-xl border border-white/20 px-5 py-3 text-center font-bold text-white hover:bg-white/10">
             Ver fixture
+          </Link>
+          <Link href="/final" className="rounded-xl border border-cyan-300/40 px-5 py-3 text-center font-bold text-cyan-200 hover:bg-cyan-300/10">
+            Predicción final
           </Link>
         </div>
       </section>
@@ -40,9 +43,17 @@ export default function Home() {
           <p className="text-sm text-slate-300">Consulta quién va ganando la polla.</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/10 p-5">
-          <h2 className="mb-2 font-bold text-white">Panel Admin</h2>
-          <p className="text-sm text-slate-300">Carga resultados reales y recalcula puntos.</p>
+          <h2 className="mb-2 font-bold text-white">Predicción final</h2>
+          <p className="text-sm text-slate-300">Elige campeón, subcampeón y tercer lugar.</p>
         </div>
+      </section>
+
+      <section className="mt-8 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-5">
+        <h2 className="mb-2 font-bold text-amber-100">Aviso importante</h2>
+        <p className="text-sm text-amber-50/90">
+          Esta plataforma es un juego social de pronósticos y ranking. No procesa apuestas,
+          pagos, depósitos, retiros ni premios dentro de la web.
+        </p>
       </section>
     </main>
   )

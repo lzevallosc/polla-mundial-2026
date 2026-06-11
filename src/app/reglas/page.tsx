@@ -41,6 +41,15 @@ export default function RulesPage() {
           <li>Perú 2 - 1 Brasil: 10 puntos</li>
         </ul>
       </div>
+    
+      <div className="mt-8 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-6">
+        <h2 className="mb-3 text-xl font-bold text-amber-100">Aviso</h2>
+        <p className="text-sm text-amber-50/90">
+          Esta web es únicamente para registrar pronósticos y calcular un ranking.
+          No administra apuestas, pagos, depósitos, retiros ni premios económicos.
+        </p>
+      </div>
+
     </main>
   )
 }
