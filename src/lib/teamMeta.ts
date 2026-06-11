@@ -55,8 +55,8 @@ export const teamMeta: Record<string, TeamMeta> = {
   'Panamá': { code: 'PA', flagUrl: makeFlag('PA') },
 
 
-  'Escocia': { code: 'SCO', fallbackType: 'badge' },
-  'Inglaterra': { code: 'ENG', fallbackType: 'badge' },
+  'Escocia': { code: 'SCO', flagUrl: 'https://flagcdn.com/w40/gb-sct.png' },
+  'Inglaterra': { code: 'ENG', flagUrl: 'https://flagcdn.com/w40/gb-eng.png' },
   'Europe 1': { code: 'EUR1', fallbackType: 'badge' },
   'Europe 2': { code: 'EUR2', fallbackType: 'badge' },
   'Europe 3': { code: 'EUR3', fallbackType: 'badge' },
