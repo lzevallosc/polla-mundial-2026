@@ -86,6 +86,26 @@ function getStatusClass(label: string) {
   return 'bg-amber-400/20 text-amber-100 border-amber-300/20'
 }
 
+function getCloseText(match: Match) {
+  if (match.status === 'finished') return 'Resultado cargado'
+
+  const now = new Date()
+  const matchDate = new Date(match.match_datetime)
+  const diffMs = matchDate.getTime() - now.getTime()
+
+  if (diffMs <= 0) return 'Partido iniciado'
+
+  const diffMinutes = Math.floor(diffMs / 60000)
+  const days = Math.floor(diffMinutes / 1440)
+  const hours = Math.floor((diffMinutes % 1440) / 60)
+  const minutes = diffMinutes % 60
+
+  if (days > 0) return `Cierra en ${days} día${days === 1 ? '' : 's'} ${hours} h`
+  if (hours > 0) return `Cierra en ${hours} h ${minutes} min`
+  return `Cierra en ${minutes} min`
+}
+
+
 export default function FixturePage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
@@ -383,9 +403,14 @@ export default function FixturePage() {
                         </p>
                       </div>
 
-                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${getStatusClass(statusLabel)}`}>
-                        {statusLabel}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`rounded-full border px-3 py-1 text-xs font-black ${getStatusClass(statusLabel)}`}>
+                          {statusLabel}
+                        </span>
+                        <span className="text-right text-[11px] font-semibold text-slate-400">
+                          {getCloseText(match)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
