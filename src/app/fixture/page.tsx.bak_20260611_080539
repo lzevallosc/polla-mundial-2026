@@ -180,11 +180,14 @@ export default function FixturePage() {
 
   async function loadData() {
     setLoading(true)
-    setMessage('')
 
     const { data: sessionData } = await supabase.auth.getSession()
+
     const currentUserId = sessionData.session?.user?.id || null
     setUserId(currentUserId)
+
+    const uid = sessionData.session.user.id
+    setUserId(uid)
 
     const { data: matchesData, error: matchesError } = await supabase
       .from('matches')
@@ -197,44 +200,32 @@ export default function FixturePage() {
       return
     }
 
-    let predictionsData: Prediction[] = []
+    const { data: predictionsData, error: predictionsError } = await supabase
+      .from('predictions')
+      .select('*')
+      .eq('user_id', uid)
 
-    if (currentUserId) {
-      const { data, error } = await supabase
-        .from('predictions')
-        .select('*')
-        .eq('user_id', currentUserId)
-
-      if (error) {
-        setMessage(error.message)
-        setLoading(false)
-        return
-      }
-
-      predictionsData = (data || []) as Prediction[]
+    if (predictionsError) {
+      setMessage(predictionsError.message)
+      setLoading(false)
+      return
     }
 
-    const predictionsByMatch: Record<number, Prediction> = {}
-    const nextScores: Record<number, ScoreDraft> = {}
+    setMatches((matchesData || []) as Match[])
 
-    ;((matchesData || []) as Match[]).forEach((match) => {
-      const existingPrediction = predictionsData.find(
-        (prediction) => prediction.match_id === match.id
-      )
+    const predMap: Record<number, Prediction> = {}
+    const scoreMap: Record<number, ScoreDraft> = {}
 
-      if (existingPrediction) {
-        predictionsByMatch[match.id] = existingPrediction
-      }
-
-      nextScores[match.id] = {
-        home: existingPrediction?.predicted_home_score?.toString() || '',
-        away: existingPrediction?.predicted_away_score?.toString() || '',
+    ;(predictionsData || []).forEach((p) => {
+      predMap[p.match_id] = p
+      scoreMap[p.match_id] = {
+        home: String(p.predicted_home_score),
+        away: String(p.predicted_away_score),
       }
     })
 
-    setMatches((matchesData || []) as Match[])
-    setPredictions(predictionsByMatch)
-    setScores(nextScores)
+    setPredictions(predMap)
+    setScores(scoreMap)
     setLoading(false)
   }
 
@@ -262,38 +253,42 @@ export default function FixturePage() {
     if (!userId) {
       router.push('/register?next=/fixture')
       return
-    }
-
-    const matchDate = new Date(match.match_datetime)
-    const isClosed = match.status !== 'open' || matchDate.getTime() <= Date.now()
-
-    if (isClosed) {
-      setMessage('Este partido ya está cerrado. No puedes registrar ni modificar el pronóstico.')
+    }setUserId(null)
       return
     }
 
-    const values = scores[match.id] || {
-      home: '',
-      away: '',
-    }
+    setMessage('')
+    setSavingMatchId(match.id)
 
-    const home = Number(values.home)
-    const away = Number(values.away)
+    const homeValue = scores[match.id]?.home
+    const awayValue = scores[match.id]?.away
+
+    const home = Number(homeValue)
+    const away = Number(awayValue)
 
     if (
-      values.home === '' ||
-      values.away === '' ||
-      !Number.isInteger(home) ||
-      !Number.isInteger(away) ||
+      homeValue === undefined ||
+      awayValue === undefined ||
+      homeValue === '' ||
+      awayValue === '' ||
+      Number.isNaN(home) ||
+      Number.isNaN(away) ||
       home < 0 ||
       away < 0
     ) {
-      setMessage('Ingresa marcadores válidos. Los goles deben ser números enteros mayores o iguales a 0.')
+      setMessage('Ingresa marcadores válidos.')
+      setSavingMatchId(null)
       return
     }
 
-    setSavingMatchId(match.id)
-    setMessage('')
+    const now = new Date()
+    const matchDate = new Date(match.match_datetime)
+
+    if (match.status !== 'open' || now >= matchDate) {
+      setMessage('Este partido ya está cerrado.')
+      setSavingMatchId(null)
+      return
+    }
 
     const { error } = await supabase.from('predictions').upsert(
       {
@@ -301,7 +296,7 @@ export default function FixturePage() {
         match_id: match.id,
         predicted_home_score: home,
         predicted_away_score: away,
-        points: 0,
+        updated_at: new Date().toISOString(),
       },
       {
         onConflict: 'user_id,match_id',
