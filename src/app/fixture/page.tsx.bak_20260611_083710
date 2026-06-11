@@ -141,53 +141,15 @@ export default function FixturePage() {
   const [savingMatchId, setSavingMatchId] = useState<number | null>(null)
   const [activeFilter, setActiveFilter] = useState('Todos')
   const [activeDayFilter, setActiveDayFilter] = useState('Todos')
-  const [activeMonthFilter, setActiveMonthFilter] = useState('Todos')
-  const [searchText, setSearchText] = useState('')
 
-
-
-  const filterOrder = [
-    'Todos',
-    'Grupo A',
-    'Grupo B',
-    'Grupo C',
-    'Grupo D',
-    'Grupo E',
-    'Grupo F',
-    'Grupo G',
-    'Grupo H',
-    'Grupo I',
-    'Grupo J',
-    'Grupo K',
-    'Grupo L',
-    'Ronda de 32',
-    'Octavos de final',
-    'Cuartos de final',
-    'Semifinal',
-    'Tercer lugar',
-    'Final',
-  ]
-
-  function sortFixtureFilters(values: string[]) {
-    return values.sort((a, b) => {
-      const indexA = filterOrder.indexOf(a)
-      const indexB = filterOrder.indexOf(b)
-
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB
-      if (indexA !== -1) return -1
-      if (indexB !== -1) return 1
-
-      return a.localeCompare(b)
-    })
-  }
 
   function getMatchDayKey(dateValue: string) {
-    return dateValue.slice(0, 10)
+    const date = new Date(dateValue)
+    return date.toISOString().slice(0, 10)
   }
 
   function getMatchDayLabel(dateValue: string) {
-    const [year, month, day] = dateValue.slice(0, 10).split('-').map(Number)
-    const date = new Date(year, month - 1, day)
+    const date = new Date(dateValue)
 
     return new Intl.DateTimeFormat('es-PE', {
       weekday: 'short',
@@ -195,28 +157,6 @@ export default function FixturePage() {
       month: 'short',
       year: 'numeric',
     }).format(date)
-  }
-
-  function getMatchMonthKey(dateValue: string) {
-    const date = new Date(dateValue)
-    return date.toISOString().slice(0, 7)
-  }
-
-  function getMatchMonthLabel(monthKey: string) {
-    const [year, month] = monthKey.split('-').map(Number)
-    const date = new Date(year, month - 1, 1)
-
-    return new Intl.DateTimeFormat('es-PE', {
-      month: 'long',
-      year: 'numeric',
-    }).format(date)
-  }
-
-  function normalizeText(value: string | null | undefined) {
-    return (value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
   }
 
   useEffect(() => {
@@ -236,68 +176,34 @@ export default function FixturePage() {
       )
     )
 
-    return sortFixtureFilters(['Todos', ...groups, ...stages])
+    return ['Todos', ...groups, ...stages]
   }, [matches])
 
-
-  const monthFilters = useMemo(() => {
-    const months = Array.from(
-      new Set(matches.map((match) => getMatchMonthKey(match.match_datetime)))
-    ).sort()
-
-    return ['Todos', ...months]
-  }, [matches])
 
   const dayFilters = useMemo(() => {
-    const baseMatches =
-      activeMonthFilter === 'Todos'
-        ? matches
-        : matches.filter((match) => getMatchMonthKey(match.match_datetime) === activeMonthFilter)
-
     const days = Array.from(
-      new Set(baseMatches.map((match) => getMatchDayKey(match.match_datetime)))
+      new Set(matches.map((match) => getMatchDayKey(match.match_datetime)))
     ).sort()
 
     return ['Todos', ...days]
-  }, [matches, activeMonthFilter])
+  }, [matches])
 
   const filteredMatches = useMemo(() => {
-    const search = normalizeText(searchText.trim())
-
     return matches.filter((match) => {
       const matchDay = getMatchDayKey(match.match_datetime)
-      const matchMonth = getMatchMonthKey(match.match_datetime)
 
       const matchesGroupOrStage =
         activeFilter === 'Todos' ||
         match.group_name === activeFilter ||
         match.stage === activeFilter
 
-      const matchesMonth =
-        activeMonthFilter === 'Todos' ||
-        matchMonth === activeMonthFilter
-
       const matchesDay =
         activeDayFilter === 'Todos' ||
         matchDay === activeDayFilter
 
-      const searchableText = normalizeText(
-        [
-          match.home_team,
-          match.away_team,
-          match.stage,
-          match.group_name,
-          match.venue,
-          `partido ${match.match_number}`,
-          getMatchDayLabel(match.match_datetime),
-        ].join(' ')
-      )
-
-      const matchesSearch = !search || searchableText.includes(search)
-
-      return matchesGroupOrStage && matchesMonth && matchesDay && matchesSearch
+      return matchesGroupOrStage && matchesDay
     })
-  }, [matches, activeFilter, activeMonthFilter, activeDayFilter, searchText])
+  }, [matches, activeFilter, activeDayFilter])
 
   const groupedMatches = useMemo(() => {
     return filteredMatches.reduce<Record<string, Match[]>>((groups, match) => {
@@ -307,13 +213,6 @@ export default function FixturePage() {
       return groups
     }, {})
   }, [filteredMatches])
-
-  function clearFilters() {
-    setSearchText('')
-    setActiveMonthFilter('Todos')
-    setActiveDayFilter('Todos')
-    setActiveFilter('Todos')
-  }
 
   async function loadData() {
     setLoading(true)
@@ -520,40 +419,29 @@ export default function FixturePage() {
             )}
           </div>
         </div>
-      </section>
+          <div className="mt-5">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-cyan-300">
+              Filtrar por día
+            </p>
 
-
-      {!userId && (
-        <section className="mb-6 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
-                Participación abierta
-              </p>
-              <p className="mt-2 text-sm leading-6 text-cyan-50/90">
-                Puedes revisar todo el fixture sin cuenta. Para guardar tus marcadores y participar en el ranking,
-                debes iniciar sesión o registrarte.
-              </p>
-            </div>
-
-            <div className="flex shrink-0 flex-wrap gap-3">
-              <button
-                onClick={() => router.push('/login?next=/fixture')}
-                className="rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
-              >
-                Iniciar sesión
-              </button>
-
-              <button
-                onClick={() => router.push('/register?next=/fixture')}
-                className="rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-300"
-              >
-                Registrarme
-              </button>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {dayFilters.map((day) => (
+                <button
+                  key={day}
+                  onClick={() => setActiveDayFilter(day)}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${
+                    activeDayFilter === day
+                      ? 'bg-cyan-400 text-slate-950'
+                      : 'border border-white/10 bg-white/10 text-slate-200 hover:bg-white/20'
+                  }`}
+                >
+                  {day === 'Todos' ? 'Todos los días' : getMatchDayLabel(day)}
+                </button>
+              ))}
             </div>
           </div>
-        </section>
-      )}
+
+      </section>
 
       {message && (
         <div className="mb-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">
@@ -561,138 +449,33 @@ export default function FixturePage() {
         </div>
       )}
 
-      <section className="mb-8 rounded-3xl border border-white/10 bg-white/10 p-5 shadow-xl">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <section className="mb-8 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">
-              Panel de búsqueda
-            </p>
-            <h2 className="mt-1 text-2xl font-black text-white">Buscar partidos</h2>
-            <p className="mt-1 text-sm text-slate-300">
-              Encuentra partidos por equipo, estadio, grupo, fase o fecha.
+            <h2 className="text-lg font-black text-white">Filtrar partidos</h2>
+            <p className="text-xs text-slate-300">
+              Mostrando {filteredMatches.length} de {matches.length} partidos
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="w-fit rounded-2xl border border-white/15 bg-slate-950/40 px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
-          >
-            Limpiar filtros
-          </button>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-300">
-              Buscar
-            </span>
-            <input
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Ej.: México, octavos, final, Guadalajara..."
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-300">
-              Mes
-            </span>
-            <select
-              value={activeMonthFilter}
-              onChange={(event) => {
-                setActiveMonthFilter(event.target.value)
-                setActiveDayFilter('Todos')
-              }}
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {filterOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setActiveFilter(option)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-black transition ${
+                activeFilter === option
+                  ? 'border-cyan-300 bg-cyan-400 text-slate-950'
+                  : 'border-white/10 bg-slate-950/40 text-slate-200 hover:bg-white/10'
+              }`}
             >
-              {monthFilters.map((month) => (
-                <option key={month} value={month} className="bg-slate-950 text-white">
-                  {month === 'Todos' ? 'Todos los meses' : getMatchMonthLabel(month)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-300">
-              Día
-            </span>
-            <select
-              value={activeDayFilter}
-              onChange={(event) => setActiveDayFilter(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
-            >
-              {dayFilters.map((day) => (
-                <option key={day} value={day} className="bg-slate-950 text-white">
-                  {day === 'Todos' ? 'Todos los días' : getMatchDayLabel(day)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-300">
-              Grupo / fase
-            </span>
-            <select
-              value={activeFilter}
-              onChange={(event) => setActiveFilter(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm font-black text-white outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
-            >
-              {filterOptions.map((option) => (
-                <option key={option} value={option} className="bg-slate-950 text-white">
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">
-              Mostrando
-            </p>
-            <p className="mt-1 text-3xl font-black text-white">
-              {filteredMatches.length}
-              <span className="text-base font-bold text-slate-300"> / {matches.length}</span>
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-              Fecha
-            </p>
-            <p className="mt-1 text-sm font-black text-white">
-              {activeDayFilter !== 'Todos'
-                ? getMatchDayLabel(activeDayFilter)
-                : activeMonthFilter !== 'Todos'
-                  ? getMatchMonthLabel(activeMonthFilter)
-                  : 'Todas las fechas'}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-              Grupo / fase
-            </p>
-            <p className="mt-1 text-sm font-black text-white">
-              {activeFilter}
-            </p>
-          </div>
+              {option}
+            </button>
+          ))}
         </div>
       </section>
-
-      {filteredMatches.length === 0 && (
-        <section className="mb-10 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-6 text-amber-50 shadow-xl">
-          <h2 className="text-xl font-black">No hay partidos con esos filtros</h2>
-          <p className="mt-2 text-sm leading-6">
-            Prueba limpiando filtros o buscando por otro equipo, fecha, grupo o fase.
-          </p>
-        </section>
-      )}
 
       {Object.entries(groupedMatches).map(([groupName, groupMatches]) => (
         <section key={groupName} className="mb-10">
@@ -723,7 +506,7 @@ export default function FixturePage() {
                           Partido #{match.match_number}
                         </p>
                         <p className="mt-1 text-sm font-semibold text-white">
-                          {matchDate.toLocaleDateString('es-PE')} · {matchDate.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                          {matchDate.toLocaleDateString()} · {matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                         <p className="mt-1 text-xs text-slate-400">
                           {match.stage}

@@ -23,13 +23,3 @@ input::placeholder,
 textarea::placeholder {
   color: #64748b !important;
 }
-
-/* Scroll horizontal limpio para filtros tipo carrusel */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}

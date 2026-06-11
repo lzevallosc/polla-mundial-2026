@@ -182,12 +182,12 @@ export default function FixturePage() {
   }
 
   function getMatchDayKey(dateValue: string) {
-    return dateValue.slice(0, 10)
+    const date = new Date(dateValue)
+    return date.toISOString().slice(0, 10)
   }
 
   function getMatchDayLabel(dateValue: string) {
-    const [year, month, day] = dateValue.slice(0, 10).split('-').map(Number)
-    const date = new Date(year, month - 1, day)
+    const date = new Date(dateValue)
 
     return new Intl.DateTimeFormat('es-PE', {
       weekday: 'short',
