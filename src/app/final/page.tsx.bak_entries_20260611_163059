@@ -8,18 +8,7 @@ import { getTeamFlag } from '@/lib/teamMeta'
 
 const FINAL_PREDICTION_DEADLINE = new Date('2026-06-11T19:00:00Z')
 
-type Entry = {
-  id: string
-  user_id: string
-  name: string
-  category: string
-  is_active: boolean
-}
-
 type FinalPrediction = {
-  id: number
-  user_id: string
-  entry_id: string | null
   champion: string | null
   runner_up: string | null
   third_place: string | null
@@ -30,9 +19,7 @@ type FinalPrediction = {
 
 export default function FinalPredictionPage() {
   const router = useRouter()
-
   const [userId, setUserId] = useState<string | null>(null)
-  const [activeEntry, setActiveEntry] = useState<Entry | null>(null)
   const [teams, setTeams] = useState<string[]>([])
   const [champion, setChampion] = useState('')
   const [runnerUp, setRunnerUp] = useState('')
@@ -41,7 +28,6 @@ export default function FinalPredictionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentPrediction, setCurrentPrediction] = useState<FinalPrediction | null>(null)
-
   const isFinalPredictionClosed = new Date() >= FINAL_PREDICTION_DEADLINE
 
   useEffect(() => {
@@ -49,65 +35,15 @@ export default function FinalPredictionPage() {
   }, [])
 
   async function loadData() {
-    setLoading(true)
-    setMessage('')
-
     const { data: sessionData } = await supabase.auth.getSession()
 
     if (!sessionData.session?.user) {
-      router.push('/login?next=/final')
+      router.push('/login')
       return
     }
 
     const uid = sessionData.session.user.id
     setUserId(uid)
-
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('active_entry_id')
-      .eq('id', uid)
-      .single()
-
-    if (profileError) {
-      setMessage(profileError.message)
-      setLoading(false)
-      return
-    }
-
-    const { data: entriesData, error: entriesError } = await supabase
-      .from('entries')
-      .select('id, user_id, name, category, is_active')
-      .eq('user_id', uid)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true })
-
-    if (entriesError) {
-      setMessage(entriesError.message)
-      setLoading(false)
-      return
-    }
-
-    const userEntries = (entriesData || []) as Entry[]
-
-    const nextActiveEntry =
-      userEntries.find((entry) => entry.id === profileData?.active_entry_id) ||
-      userEntries[0] ||
-      null
-
-    if (!nextActiveEntry) {
-      setActiveEntry(null)
-      setLoading(false)
-      return
-    }
-
-    if (profileData?.active_entry_id !== nextActiveEntry.id) {
-      await supabase
-        .from('profiles')
-        .update({ active_entry_id: nextActiveEntry.id })
-        .eq('id', uid)
-    }
-
-    setActiveEntry(nextActiveEntry)
 
     const { data: matchesData } = await supabase
       .from('matches')
@@ -123,29 +59,17 @@ export default function FinalPredictionPage() {
 
     setTeams(uniqueTeams)
 
-    const { data: predictionData, error: predictionError } = await supabase
+    const { data } = await supabase
       .from('final_predictions')
       .select('*')
-      .eq('entry_id', nextActiveEntry.id)
+      .eq('user_id', uid)
       .maybeSingle()
 
-    if (predictionError) {
-      setMessage(predictionError.message)
-      setLoading(false)
-      return
-    }
-
-    if (predictionData) {
-      const prediction = predictionData as FinalPrediction
-      setCurrentPrediction(prediction)
-      setChampion(prediction.champion || '')
-      setRunnerUp(prediction.runner_up || '')
-      setThirdPlace(prediction.third_place || '')
-    } else {
-      setCurrentPrediction(null)
-      setChampion('')
-      setRunnerUp('')
-      setThirdPlace('')
+    if (data) {
+      setCurrentPrediction(data as FinalPrediction)
+      setChampion(data.champion || '')
+      setRunnerUp(data.runner_up || '')
+      setThirdPlace(data.third_place || '')
     }
 
     setLoading(false)
@@ -155,15 +79,7 @@ export default function FinalPredictionPage() {
     e.preventDefault()
     setMessage('')
 
-    if (!userId) {
-      router.push('/login?next=/final')
-      return
-    }
-
-    if (!activeEntry) {
-      router.push('/mis-participaciones')
-      return
-    }
+    if (!userId) return
 
     if (isFinalPredictionClosed) {
       setMessage('La predicción final ya está cerrada porque el torneo ya empezó.')
@@ -182,31 +98,26 @@ export default function FinalPredictionPage() {
 
     setSaving(true)
 
-    const payload = {
-      user_id: userId,
-      entry_id: activeEntry.id,
-      champion,
-      runner_up: runnerUp,
-      third_place: thirdPlace,
-      updated_at: new Date().toISOString(),
-    }
+    const { error } = await supabase.from('final_predictions').upsert(
+      {
+        user_id: userId,
+        champion,
+        runner_up: runnerUp,
+        third_place: thirdPlace,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'user_id',
+      }
+    )
 
-    const result = currentPrediction?.id
-      ? await supabase
-          .from('final_predictions')
-          .update(payload)
-          .eq('id', currentPrediction.id)
-      : await supabase
-          .from('final_predictions')
-          .insert(payload)
-
-    if (result.error) {
-      setMessage(result.error.message)
+    if (error) {
+      setMessage(error.message)
       setSaving(false)
       return
     }
 
-    setMessage(`Predicción final guardada para ${activeEntry.name}.`)
+    setMessage('Predicción final guardada correctamente.')
     setSaving(false)
     await loadData()
   }
@@ -227,66 +138,13 @@ export default function FinalPredictionPage() {
         <p className="mb-2 text-xs font-bold uppercase tracking-widest text-cyan-300">
           Mundial 2026
         </p>
-
         <h1 className="text-3xl font-black text-white md:text-5xl">
           Predicción Final
         </h1>
-
         <p className="mt-2 text-slate-200">
-          Elige campeón, subcampeón y tercer lugar para tu participación activa.
-          Estos puntos pueden cambiar todo el ranking.
+          Elige tu campeón, subcampeón y tercer lugar. Estos puntos pueden cambiar todo el ranking.
         </p>
       </section>
-
-      {activeEntry ? (
-        <section className="mb-6 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
-                Participación activa
-              </p>
-
-              <p className="mt-2 text-lg font-black text-white">
-                {activeEntry.name}
-                <span className="ml-2 rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-950">
-                  {activeEntry.category}
-                </span>
-              </p>
-
-              <p className="mt-1 text-sm text-cyan-50/80">
-                La predicción final se guardará solo para esta participación.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/mis-participaciones')}
-              className="w-fit rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
-            >
-              Cambiar participación
-            </button>
-          </div>
-        </section>
-      ) : (
-        <section className="mb-6 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-amber-200">
-                Necesitas una participación
-              </p>
-              <p className="mt-2 text-sm leading-6 text-amber-50/90">
-                Para guardar predicción final debes crear o seleccionar una participación.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/mis-participaciones')}
-              className="w-fit rounded-2xl bg-amber-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-200"
-            >
-              Crear participación
-            </button>
-          </div>
-        </section>
-      )}
 
       <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
         <div className={`mb-6 rounded-2xl border p-4 text-sm font-semibold ${
@@ -334,8 +192,8 @@ export default function FinalPredictionPage() {
           )}
 
           <button
-            disabled={saving || isFinalPredictionClosed || !activeEntry}
-            className="w-full rounded-2xl bg-cyan-400 p-4 font-black text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={saving || isFinalPredictionClosed}
+            className="w-full rounded-2xl bg-cyan-400 p-4 font-black text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
           >
             {saving ? 'Guardando...' : 'Guardar predicción final'}
           </button>
@@ -344,8 +202,7 @@ export default function FinalPredictionPage() {
 
       {currentPrediction && (
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-6">
-          <h2 className="mb-4 text-xl font-black">Predicción actual de {activeEntry?.name}</h2>
-
+          <h2 className="mb-4 text-xl font-black">Tu predicción actual</h2>
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl bg-white/10 p-4">
               <p className="text-xs uppercase tracking-widest text-slate-400">Campeón</p>
