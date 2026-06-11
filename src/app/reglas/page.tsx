@@ -3,6 +3,18 @@ export default function RulesPage() {
     <main className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-6 text-3xl font-black text-white">Reglas de puntaje</h1>
 
+      <div className="mb-8 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-6">
+        <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-200">
+          Actividad interna PeruRail
+        </p>
+        <p className="text-sm text-slate-200">
+          Esta polla mundialista es una dinámica social de pronósticos para colaboradores
+          de PeruRail. El objetivo es participar, competir sanamente y seguir el ranking
+          durante el Mundial 2026.
+        </p>
+      </div>
+
+
       <div className="space-y-4 rounded-3xl border border-white/10 bg-white/10 p-6">
         <div className="rounded-xl bg-white/10 p-4">
           <p><b>+3 puntos</b> por acertar ganador o empate.</p>

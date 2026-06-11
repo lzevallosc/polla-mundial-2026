@@ -6,8 +6,11 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/" className="text-lg font-bold text-white">
-            Polla Mundial 2026
+          <Link href="/" className="flex flex-col leading-tight">
+            <span className="text-lg font-black text-white">Polla Mundial 2026</span>
+            <span className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">
+              PeruRail
+            </span>
           </Link>
 
           <div className="sm:hidden">
