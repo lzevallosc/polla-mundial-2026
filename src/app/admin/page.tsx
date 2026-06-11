@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { calculateMatchPoints } from '@/lib/scoring'
@@ -31,10 +31,36 @@ export default function AdminPage() {
   const [matches, setMatches] = useState<Match[]>([])
   const [scores, setScores] = useState<Record<number, { home: string; away: string }>>({})
   const [message, setMessage] = useState('')
+  const [activeFilter, setActiveFilter] = useState('Todos')
 
   useEffect(() => {
     checkAdmin()
   }, [])
+
+  const filterOptions = useMemo(() => {
+    const groups = Array.from(
+      new Set(matches.map((match) => match.group_name).filter(Boolean))
+    ) as string[]
+
+    const stages = Array.from(
+      new Set(
+        matches
+          .filter((match) => match.stage !== 'Fase de grupos')
+          .map((match) => match.stage)
+      )
+    )
+
+    return ['Todos', ...groups, ...stages]
+  }, [matches])
+
+  const filteredMatches = useMemo(() => {
+    if (activeFilter === 'Todos') return matches
+
+    return matches.filter((match) => {
+      return match.group_name === activeFilter || match.stage === activeFilter
+    })
+  }, [matches, activeFilter])
+
 
   async function checkAdmin() {
     const { data: sessionData } = await supabase.auth.getSession()
@@ -152,8 +178,36 @@ export default function AdminPage() {
 
       {message && <p className="mb-4 rounded-xl bg-white/10 p-3 text-sm">{message}</p>}
 
+      <section className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-white">Filtrar partidos</h2>
+            <p className="text-xs text-slate-300">
+              Mostrando {filteredMatches.length} de {matches.length} partidos
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {filterOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setActiveFilter(option)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-black transition ${
+                activeFilter === option
+                  ? 'border-cyan-300 bg-cyan-400 text-slate-950'
+                  : 'border-white/10 bg-slate-950/40 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="space-y-4">
-        {matches.map((match) => (
+        {filteredMatches.map((match) => (
           <div key={match.id} className="rounded-3xl border border-white/10 bg-white/10 p-5">
             <div className="mb-3 text-sm text-slate-300">
               #{match.match_number} · {match.stage} · {match.group_name} · Estado: {match.status}
