@@ -5,11 +5,11 @@ export default function RulesPage() {
 
       <div className="mb-8 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-6">
         <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-200">
-          Actividad interna PeruRail
+          Actividad privada Polla Mundial 2026
         </p>
         <p className="text-sm text-slate-200">
-          Esta polla mundialista es una dinámica social de pronósticos para colaboradores
-          de PeruRail. El objetivo es participar, competir sanamente y seguir el ranking
+          Esta polla mundialista es una dinámica social de pronósticos para participantes
+          de Polla Mundial 2026. El objetivo es participar, competir sanamente y seguir el ranking
           durante el Mundial 2026.
         </p>
       </div>

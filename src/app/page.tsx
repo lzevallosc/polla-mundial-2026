@@ -10,12 +10,16 @@ export default function Home() {
 
         <div className="relative grid gap-8 p-7 md:grid-cols-[1.2fr_0.8fr] md:p-10">
           <div>
-            <div className="mb-8">
-              <img
-                src="/perurail-logo.svg"
-                alt="PeruRail"
-                className="h-14 w-auto object-contain drop-shadow-[0_10px_30px_rgba(0,0,0,0.28)] md:h-16"
-              />
+            <div className="mb-8 inline-flex items-center gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 shadow-xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400 text-lg font-black text-slate-950">
+                PM
+              </div>
+              <div>
+                <p className="text-sm font-black text-white">Polla Mundial 2026</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
+                  Actividad privada
+                </p>
+              </div>
             </div>
 
             <p className="mb-3 text-sm font-black uppercase tracking-[0.28em] text-cyan-300">
@@ -27,9 +31,8 @@ export default function Home() {
             </h1>
 
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 md:text-lg">
-              Plataforma interna de pronósticos para colaboradores de PeruRail.
-              Registra tus marcadores, compite con tus amigos y revisa el ranking
-              en tiempo real.
+              Plataforma de pronósticos para el Mundial 2026. Registra tus marcadores,
+              compite con otros participantes y revisa el ranking en tiempo real.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -67,7 +70,7 @@ export default function Home() {
             <div className="ml-auto inline-flex w-fit items-center gap-3 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2">
               <span className="h-2 w-2 rounded-full bg-cyan-300" />
               <span className="text-xs font-black uppercase tracking-[0.25em] text-cyan-200">
-                Actividad interna
+                Actividad privada
               </span>
             </div>
 
@@ -136,7 +139,7 @@ export default function Home() {
             Ranking
           </p>
           <h2 className="mb-2 text-lg font-black text-white group-hover:text-cyan-200">
-            Top 10 en vivo
+            Tabla general
           </h2>
           <p className="text-sm text-slate-300">
             Consulta quién va ganando la polla y cuántos puntos tiene.
@@ -162,9 +165,8 @@ export default function Home() {
       <section className="mt-8 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl">
         <h2 className="mb-2 font-black text-amber-100">Aviso importante</h2>
         <p className="text-sm leading-6 text-amber-50/90">
-          Esta plataforma es una actividad interna de entretenimiento para colaboradores
-          de PeruRail. No procesa apuestas, pagos, depósitos, retiros ni premios dentro
-          de la web.
+          Esta plataforma es una actividad privada de entretenimiento. No procesa apuestas,
+          pagos, depósitos, retiros ni premios dentro de la web.
         </p>
       </section>
     </main>

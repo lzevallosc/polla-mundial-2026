@@ -145,7 +145,7 @@ export default function RankingPage() {
     <main className="mx-auto max-w-6xl px-4 py-10">
       <section className="mb-8 rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#16265f] via-[#111a3a] to-[#05091c] p-7 shadow-2xl">
         <p className="mb-3 text-sm font-black uppercase tracking-[0.28em] text-cyan-300">
-          PeruRail · Mundial 2026
+          Polla Mundial 2026
         </p>
 
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

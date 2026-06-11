@@ -7,16 +7,14 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#05091c]/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <img
-            src="/perurail-logo.svg"
-            alt="PeruRail"
-            className="h-9 w-auto object-contain drop-shadow-[0_4px_14px_rgba(0,0,0,0.35)]"
-          />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400 text-sm font-black text-slate-950 shadow-lg">
+            PM
+          </div>
 
           <div className="leading-tight">
             <p className="text-sm font-black text-white">Polla Mundial 2026</p>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-300">
-              Actividad interna
+              Actividad privada
             </p>
           </div>
         </Link>
