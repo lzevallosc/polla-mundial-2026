@@ -136,6 +136,9 @@ export default function AdminPage() {
       return
     }
 
+    let recalculated = 0
+    let failedUpdates = 0
+
     for (const p of (predictions || []) as Prediction[]) {
       const points = calculateMatchPoints({
         predictedHome: p.predicted_home_score,
@@ -144,10 +147,24 @@ export default function AdminPage() {
         realAway: away,
       })
 
-      await supabase.from('predictions').update({ points }).eq('id', p.id)
+      const { error: updateError } = await supabase
+        .from('predictions')
+        .update({ points })
+        .eq('id', p.id)
+
+      if (updateError) {
+        failedUpdates += 1
+      } else {
+        recalculated += 1
+      }
     }
 
-    setMessage('Resultado guardado y puntos recalculados.')
+    if (failedUpdates > 0) {
+      setMessage(`Resultado guardado. Recalculados: ${recalculated}. Fallidos: ${failedUpdates}.`)
+    } else {
+      setMessage(`Resultado guardado. Pronósticos recalculados: ${recalculated}.`)
+    }
+
     await loadMatches()
   }
 
