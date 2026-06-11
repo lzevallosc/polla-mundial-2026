@@ -22,27 +22,14 @@ export async function GET(request: NextRequest) {
     cache: 'no-store',
   })
 
-  const text = await response.text()
+  const data = await response.json()
 
-  let data: unknown = null
-
-  try {
-    data = text ? JSON.parse(text) : null
-  } catch {
-    data = {
-      raw: text,
-    }
-  }
-
-  return NextResponse.json(
-    {
-      ok: response.ok,
-      source: 'external-cron',
-      status: response.status,
-      data,
-    },
-    {
-      status: response.ok ? 200 : response.status,
-    }
-  )
+  return NextResponse.json({
+    ok: response.ok,
+    source: 'vercel-cron',
+    status: response.status,
+    data,
+  }, {
+    status: response.ok ? 200 : response.status,
+  })
 }

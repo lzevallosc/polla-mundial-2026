@@ -40,8 +40,8 @@ type FootballDataMatch = {
 
 type Prediction = {
   id: string
-  predicted_home_score: number | null
-  predicted_away_score: number | null
+  home_score: number | null
+  away_score: number | null
 }
 
 function normalizeTeam(value: string | null | undefined) {
@@ -208,7 +208,7 @@ async function recalculatePredictions(
 ) {
   const { data: predictions, error } = await supabaseAdmin
     .from('predictions')
-    .select('id, predicted_home_score, predicted_away_score')
+    .select('id, home_score, away_score')
     .eq('match_id', matchId)
 
   if (error) {
@@ -216,11 +216,11 @@ async function recalculatePredictions(
   }
 
   const updates = ((predictions || []) as Prediction[])
-    .filter((prediction) => prediction.predicted_home_score !== null && prediction.predicted_away_score !== null)
+    .filter((prediction) => prediction.home_score !== null && prediction.away_score !== null)
     .map((prediction) => {
       const points = calculateMatchPoints(
-        Number(prediction.predicted_home_score),
-        Number(prediction.predicted_away_score),
+        Number(prediction.home_score),
+        Number(prediction.away_score),
         actualHome,
         actualAway
       )
