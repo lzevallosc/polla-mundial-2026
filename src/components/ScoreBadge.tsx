@@ -1,36 +1,38 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
-type Entry = {
+type ActiveEntry = {
   id: string
   name: string
   category: string
 }
 
-type FinalPrediction = {
-  champion_points: number
-  runner_up_points: number
-  third_place_points: number
-}
-
 export default function ScoreBadge() {
-  const [total, setTotal] = useState<number | null>(null)
-  const [matchPoints, setMatchPoints] = useState(0)
-  const [extraPoints, setExtraPoints] = useState(0)
-  const [activeEntry, setActiveEntry] = useState<Entry | null>(null)
+  const [score, setScore] = useState(0)
+  const [entry, setEntry] = useState<ActiveEntry | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadScore()
 
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const interval = window.setInterval(() => {
       loadScore()
-    })
+    }, 30000)
+
+    const onFocus = () => loadScore()
+    const onVisibilityChange = () => {
+      if (!document.hidden) loadScore()
+    }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
-      data.subscription.unsubscribe()
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [])
 
@@ -38,18 +40,21 @@ export default function ScoreBadge() {
     const { data: sessionData } = await supabase.auth.getSession()
 
     if (!sessionData.session?.user) {
-      setTotal(null)
-      setActiveEntry(null)
+      setScore(0)
+      setEntry(null)
+      setLoading(false)
       return
     }
 
     const userId = sessionData.session.user.id
 
-    const { data: profileData } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('active_entry_id')
       .eq('id', userId)
       .single()
+
+    let activeEntryId = profile?.active_entry_id || null
 
     const { data: entriesData } = await supabase
       .from('entries')
@@ -58,59 +63,72 @@ export default function ScoreBadge() {
       .eq('is_active', true)
       .order('created_at', { ascending: true })
 
-    const entries = (entriesData || []) as Entry[]
+    const entries = (entriesData || []) as ActiveEntry[]
 
-    const entry =
-      entries.find((item) => item.id === profileData?.active_entry_id) ||
+    if (!activeEntryId && entries.length > 0) {
+      activeEntryId = entries[0].id
+    }
+
+    const activeEntry =
+      entries.find((item) => item.id === activeEntryId) ||
       entries[0] ||
       null
 
-    if (!entry) {
-      setTotal(0)
-      setMatchPoints(0)
-      setExtraPoints(0)
-      setActiveEntry(null)
+    if (!activeEntry) {
+      setScore(0)
+      setEntry(null)
+      setLoading(false)
       return
     }
 
-    setActiveEntry(entry)
-
-    const { data: predictions } = await supabase
+    const { data: predictionsData } = await supabase
       .from('predictions')
       .select('points')
-      .eq('entry_id', entry.id)
+      .eq('entry_id', activeEntry.id)
 
-    const { data: finalPrediction } = await supabase
-      .from('final_predictions')
-      .select('champion_points, runner_up_points, third_place_points')
-      .eq('entry_id', entry.id)
-      .maybeSingle()
-
-    const pointsByMatches = (predictions || []).reduce(
-      (sum, item) => sum + (item.points || 0),
+    const matchPoints = (predictionsData || []).reduce(
+      (sum, item) => sum + Number(item.points || 0),
       0
     )
 
-    const finalPoints = finalPrediction
-      ? (finalPrediction as FinalPrediction).champion_points +
-        (finalPrediction as FinalPrediction).runner_up_points +
-        (finalPrediction as FinalPrediction).third_place_points
-      : 0
+    const { data: finalData } = await supabase
+      .from('final_predictions')
+      .select('champion_points, runner_up_points, third_place_points')
+      .eq('entry_id', activeEntry.id)
+      .maybeSingle()
 
-    setMatchPoints(pointsByMatches)
-    setExtraPoints(finalPoints)
-    setTotal(pointsByMatches + finalPoints)
+    const finalPoints =
+      Number(finalData?.champion_points || 0) +
+      Number(finalData?.runner_up_points || 0) +
+      Number(finalData?.third_place_points || 0)
+
+    setScore(matchPoints + finalPoints)
+    setEntry(activeEntry)
+    setLoading(false)
   }
 
-  if (total === null) return null
+  if (loading) {
+    return (
+      <span className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black text-slate-950">
+        Score: ...
+      </span>
+    )
+  }
+
+  if (!entry) {
+    return (
+      <span className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black text-slate-950">
+        Score: {score}
+      </span>
+    )
+  }
 
   return (
-    <Link
-      href="/mis-puntos"
-      className="rounded-2xl border border-cyan-300/30 bg-cyan-400 px-3 py-2 text-xs font-black text-slate-950 shadow hover:bg-cyan-300"
-      title={`${activeEntry ? `${activeEntry.name} · ${activeEntry.category} · ` : ''}Partidos: ${matchPoints} · Extras: ${extraPoints}`}
+    <span
+      title={`${entry.name} · ${entry.category}`}
+      className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black text-slate-950"
     >
-      Score: {total}
-    </Link>
+      {entry.category}: {score}
+    </span>
   )
 }
