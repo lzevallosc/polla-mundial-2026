@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { getTeamCode, getTeamFlag } from '@/lib/teamMeta'
+import { getTeamCode, getTeamFlagUrl, hasImageFlag } from '@/lib/teamMeta'
 
 type TeamSelectorProps = {
   label: string
@@ -10,6 +10,30 @@ type TeamSelectorProps = {
   onChange: (team: string) => void
   placeholder?: string
   pointsLabel?: string
+}
+
+function TeamAvatar({ team }: { team: string }) {
+  const flagUrl = getTeamFlagUrl(team)
+  const code = getTeamCode(team)
+
+  if (hasImageFlag(team) && flagUrl) {
+    return (
+      <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-slate-200">
+        <img
+          src={flagUrl}
+          alt={team}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-cyan-400 font-black text-[11px] text-slate-950 shadow-sm">
+      {code}
+    </div>
+  )
 }
 
 export default function TeamSelector({
@@ -28,10 +52,10 @@ export default function TeamSelector({
 
     if (!query) return teams
 
-    return teams.filter((team) =>
-      team.toLowerCase().includes(query) ||
-      getTeamCode(team).toLowerCase().includes(query)
-    )
+    return teams.filter((team) => {
+      const code = getTeamCode(team).toLowerCase()
+      return team.toLowerCase().includes(query) || code.includes(query)
+    })
   }, [teams, search])
 
   function selectTeam(team: string) {
@@ -61,9 +85,7 @@ export default function TeamSelector({
       >
         {value ? (
           <span className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-2xl">
-              {getTeamFlag(value)}
-            </span>
+            <TeamAvatar team={value} />
             <span>
               <span className="block font-black">{value}</span>
               <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -84,7 +106,7 @@ export default function TeamSelector({
         <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-2xl">
           <div className="border-b border-white/10 bg-slate-900 p-3">
             <input
-              className="w-full rounded-2xl border border-white/10 bg-white p-3 text-slate-950"
+              className="w-full rounded-2xl border border-white/10 bg-white p-3 text-slate-950 outline-none"
               placeholder="Buscar equipo..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -113,15 +135,15 @@ export default function TeamSelector({
                       : 'bg-white/10 text-white hover:bg-white/20'
                   }`}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl">
-                    {getTeamFlag(team)}
-                  </span>
+                  <TeamAvatar team={team} />
 
                   <span className="flex-1">
                     <span className="block font-black">{team}</span>
-                    <span className={`text-xs font-bold uppercase tracking-widest ${
-                      selected ? 'text-slate-700' : 'text-slate-400'
-                    }`}>
+                    <span
+                      className={`text-xs font-bold uppercase tracking-widest ${
+                        selected ? 'text-slate-700' : 'text-slate-400'
+                      }`}
+                    >
                       {getTeamCode(team)}
                     </span>
                   </span>
