@@ -37,16 +37,8 @@ export default function MyEntriesPage() {
   const [allEntries, setAllEntries] = useState<Entry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [maxEntries, setMaxEntries] = useState(3)
-  const [entriesLockAt, setEntriesLockAt] = useState('2026-06-11T19:00:00Z')
-  const [entriesAreOpen, setEntriesAreOpen] = useState(true)
-
   const [name, setName] = useState('')
   const [category, setCategory] = useState('Junior')
-
-  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
-  const [editingCategory, setEditingCategory] = useState('Junior')
-
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -70,15 +62,6 @@ export default function MyEntriesPage() {
   const activeEntry = useMemo(() => {
     return entries.find((entry) => entry.id === profile?.active_entry_id) || entries[0] || null
   }, [entries, profile])
-
-  const lockDateLabel = useMemo(() => {
-    const date = new Date(entriesLockAt)
-
-    return new Intl.DateTimeFormat('es-PE', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(date)
-  }, [entriesLockAt])
 
   async function loadData() {
     setLoading(true)
@@ -120,16 +103,9 @@ export default function MyEntriesPage() {
 
     const { data: settingsData } = await supabase
       .from('app_settings')
-      .select('key, value')
-      .in('key', ['max_entries_per_user', 'entries_lock_at'])
-
-    const settings = Object.fromEntries(
-      (settingsData || []).map((item) => [item.key, item.value])
-    ) as Record<string, string>
-
-    const nextMaxEntries = Number(settings.max_entries_per_user || 3)
-    const nextEntriesLockAt = settings.entries_lock_at || '2026-06-11T19:00:00Z'
-    const nextEntriesAreOpen = new Date() < new Date(nextEntriesLockAt)
+      .select('value')
+      .eq('key', 'max_entries_per_user')
+      .single()
 
     const { data: entriesData, error: entriesError } = await supabase
       .from('entries')
@@ -163,17 +139,14 @@ export default function MyEntriesPage() {
     setCategories(nextCategories)
     setEntries(nextEntries)
     setAllEntries((allEntriesData || []) as Entry[])
-    setMaxEntries(nextMaxEntries)
-    setEntriesLockAt(nextEntriesLockAt)
-    setEntriesAreOpen(nextEntriesAreOpen)
+    setMaxEntries(Number(settingsData?.value || 3))
 
     if (nextCategories.length > 0) {
       setCategory(nextCategories[0].name)
-      setEditingCategory(nextCategories[0].name)
     }
 
     if (!nextProfile.active_entry_id && nextEntries.length > 0) {
-      await selectActiveEntry(nextEntries[0].id, false)
+      await setActiveEntry(nextEntries[0].id, false)
     }
 
     setLoading(false)
@@ -183,11 +156,6 @@ export default function MyEntriesPage() {
     event.preventDefault()
 
     if (!userId) return
-
-    if (!entriesAreOpen) {
-      setMessage('Las participaciones ya están cerradas. No puedes crear nuevas participaciones.')
-      return
-    }
 
     const cleanName = name.trim()
 
@@ -223,7 +191,7 @@ export default function MyEntriesPage() {
     setName('')
 
     if (data?.id) {
-      await selectActiveEntry(data.id, false)
+      await setActiveEntry(data.id, false)
     }
 
     await loadData()
@@ -231,107 +199,7 @@ export default function MyEntriesPage() {
     setMessage('Participación creada correctamente.')
   }
 
-  function startEdit(entry: Entry) {
-    if (!entriesAreOpen) {
-      setMessage('Las participaciones ya están cerradas. No puedes editar nombre ni categoría.')
-      return
-    }
-
-    setEditingEntryId(entry.id)
-    setEditingName(entry.name)
-    setEditingCategory(entry.category)
-    setMessage('')
-  }
-
-  function cancelEdit() {
-    setEditingEntryId(null)
-    setEditingName('')
-    setEditingCategory(categories[0]?.name || 'Junior')
-  }
-
-  async function saveEdit(entry: Entry) {
-    if (!entriesAreOpen) {
-      setMessage('Las participaciones ya están cerradas. No puedes editar nombre ni categoría.')
-      return
-    }
-
-    const cleanName = editingName.trim()
-
-    if (cleanName.length < 2) {
-      setMessage('Ingresa un nombre válido para la participación.')
-      return
-    }
-
-    setSaving(true)
-    setMessage('')
-
-    const { error } = await supabase
-      .from('entries')
-      .update({
-        name: cleanName,
-        category: editingCategory,
-      })
-      .eq('id', entry.id)
-
-    if (error) {
-      setMessage(error.message)
-      setSaving(false)
-      return
-    }
-
-    cancelEdit()
-    await loadData()
-    setSaving(false)
-    setMessage('Participación actualizada correctamente.')
-  }
-
-  async function deactivateEntry(entry: Entry) {
-    if (!entriesAreOpen) {
-      setMessage('Las participaciones ya están cerradas. No puedes eliminar participaciones.')
-      return
-    }
-
-    if (entries.length <= 1) {
-      setMessage('No puedes eliminar tu única participación activa.')
-      return
-    }
-
-    const confirmed = window.confirm(
-      `¿Seguro que quieres eliminar "${entry.name}"? Sus pronósticos quedarán guardados como histórico, pero ya no competirá en el ranking.`
-    )
-
-    if (!confirmed) return
-
-    setSaving(true)
-    setMessage('')
-
-    const { error } = await supabase
-      .from('entries')
-      .update({
-        is_active: false,
-      })
-      .eq('id', entry.id)
-
-    if (error) {
-      setMessage(error.message)
-      setSaving(false)
-      return
-    }
-
-    if (profile?.active_entry_id === entry.id) {
-      const nextEntry = entries.find((item) => item.id !== entry.id)
-
-      if (nextEntry) {
-        await selectActiveEntry(nextEntry.id, false)
-      }
-    }
-
-    await loadData()
-    setSaving(false)
-    setMessage('Participación eliminada correctamente.')
-  }
-
-  async function selectActiveEntry(entryId: string, reload = true) {
+  async function setActiveEntry(entryId: string, reload = true) {
     if (!userId) return
 
     const { error } = await supabase
@@ -390,32 +258,6 @@ export default function MyEntriesPage() {
         </div>
       </section>
 
-      <section
-        className={`mb-6 rounded-3xl border p-5 shadow-xl ${
-          entriesAreOpen
-            ? 'border-emerald-300/20 bg-emerald-400/10'
-            : 'border-red-300/20 bg-red-400/10'
-        }`}
-      >
-        <p
-          className={`text-sm font-black uppercase tracking-[0.22em] ${
-            entriesAreOpen ? 'text-emerald-200' : 'text-red-200'
-          }`}
-        >
-          {entriesAreOpen ? 'Participaciones abiertas' : 'Participaciones cerradas'}
-        </p>
-
-        <p className="mt-2 text-sm leading-6 text-slate-100">
-          {entriesAreOpen
-            ? `Puedes crear, editar o eliminar participaciones hasta: ${lockDateLabel}.`
-            : `Ya no se pueden crear, editar ni eliminar participaciones. Cierre: ${lockDateLabel}.`}
-        </p>
-
-        <p className="mt-1 text-xs text-slate-300">
-          Seleccionar una participación activa seguirá permitido para consultar puntos y pronósticos.
-        </p>
-      </section>
-
       {message && (
         <section className="mb-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">
           {message}
@@ -460,7 +302,7 @@ export default function MyEntriesPage() {
               onChange={(event) => setName(event.target.value)}
               placeholder="Ej.: Luis arriesgado, Luis favoritos..."
               className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none"
-              disabled={!entriesAreOpen || entries.length >= maxEntries}
+              disabled={entries.length >= maxEntries}
             />
           </div>
 
@@ -472,7 +314,7 @@ export default function MyEntriesPage() {
               value={category}
               onChange={(event) => setCategory(event.target.value)}
               className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none"
-              disabled={!entriesAreOpen || entries.length >= maxEntries}
+              disabled={entries.length >= maxEntries}
             >
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.name}>
@@ -484,22 +326,16 @@ export default function MyEntriesPage() {
 
           <button
             type="submit"
-            disabled={saving || !entriesAreOpen || entries.length >= maxEntries}
+            disabled={saving || entries.length >= maxEntries}
             className="rounded-2xl bg-cyan-400 px-6 py-3 font-black text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-500"
           >
-            {saving ? 'Guardando...' : 'Crear'}
+            {saving ? 'Creando...' : 'Crear'}
           </button>
         </form>
 
         {entries.length >= maxEntries && (
           <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-50">
             Llegaste al límite actual de participaciones. El límite puede modificarse desde configuración admin.
-          </p>
-        )}
-
-        {!entriesAreOpen && (
-          <p className="mt-4 rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">
-            Las participaciones están cerradas. Ya no puedes crear nuevas participaciones.
           </p>
         )}
       </section>
@@ -521,111 +357,41 @@ export default function MyEntriesPage() {
 
           {entries.map((entry) => {
             const isActive = activeEntry?.id === entry.id
-            const isEditing = editingEntryId === entry.id
 
             return (
               <div
                 key={entry.id}
-                className={`grid gap-4 p-5 ${
+                className={`grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center ${
                   isActive ? 'bg-cyan-300/10' : ''
                 }`}
               >
-                {isEditing ? (
-                  <div className="grid gap-4 md:grid-cols-[1.4fr_1fr_auto] md:items-end">
-                    <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
-                        Nombre
-                      </label>
-                      <input
-                        value={editingName}
-                        onChange={(event) => setEditingName(event.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none"
-                      />
-                    </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-xl font-black text-white">{entry.name}</h3>
 
-                    <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
-                        Categoría
-                      </label>
-                      <select
-                        value={editingCategory}
-                        onChange={(event) => setEditingCategory(event.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none"
-                      >
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.name}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">
+                      {entry.category}
+                    </span>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => saveEdit(entry)}
-                        disabled={saving}
-                        className="rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-black text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
-                      >
-                        Guardar
-                      </button>
-
-                      <button
-                        onClick={cancelEdit}
-                        className="rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white hover:bg-white/10"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
+                    {isActive && (
+                      <span className="rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-950">
+                        Activa
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-xl font-black text-white">{entry.name}</h3>
 
-                        <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">
-                          {entry.category}
-                        </span>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Creada el {new Date(entry.created_at).toLocaleDateString()}
+                  </p>
+                </div>
 
-                        {isActive && (
-                          <span className="rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-950">
-                            Activa
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="mt-2 text-sm text-slate-400">
-                        Creada el {new Date(entry.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => selectActiveEntry(entry.id)}
-                        disabled={isActive}
-                        className="rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isActive ? 'Seleccionada' : 'Seleccionar'}
-                      </button>
-
-                      <button
-                        onClick={() => startEdit(entry)}
-                        disabled={!entriesAreOpen || saving}
-                        className="rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Editar
-                      </button>
-
-                      <button
-                        onClick={() => deactivateEntry(entry)}
-                        disabled={!entriesAreOpen || saving || entries.length <= 1}
-                        className="rounded-2xl border border-red-300/30 bg-red-400/10 px-5 py-3 text-sm font-black text-red-100 transition hover:bg-red-400/20 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setActiveEntry(entry.id)}
+                  disabled={isActive}
+                  className="rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isActive ? 'Seleccionada' : 'Seleccionar'}
+                </button>
               </div>
             )
           })}
