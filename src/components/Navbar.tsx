@@ -21,6 +21,7 @@ export default function Navbar() {
 
         <nav className="flex flex-wrap items-center gap-3 text-sm text-slate-300 sm:gap-4">
           <Link className="transition hover:text-cyan-300" href="/fixture">Fixture</Link>
+          <Link className="transition hover:text-cyan-300" href="/mis-participaciones">Participaciones</Link>
           <Link className="transition hover:text-cyan-300" href="/final">Final</Link>
           <Link className="transition hover:text-cyan-300" href="/mis-puntos">Mis puntos</Link>
           <Link className="transition hover:text-cyan-300" href="/ranking">Ranking</Link>
