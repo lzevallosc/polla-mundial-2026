@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { getTeamDisplayName } from '@/lib/teamMeta'
 
 type FinalPrediction = {
   champion: string | null
@@ -144,7 +145,7 @@ export default function FinalPredictionPage() {
             >
               <option value="">Selecciona campeón</option>
               {teams.map((team) => (
-                <option key={team} value={team}>{team}</option>
+                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
               ))}
             </select>
           </div>
@@ -161,7 +162,7 @@ export default function FinalPredictionPage() {
             >
               <option value="">Selecciona subcampeón</option>
               {teams.map((team) => (
-                <option key={team} value={team}>{team}</option>
+                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
               ))}
             </select>
           </div>
@@ -178,7 +179,7 @@ export default function FinalPredictionPage() {
             >
               <option value="">Selecciona tercer lugar</option>
               {teams.map((team) => (
-                <option key={team} value={team}>{team}</option>
+                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
               ))}
             </select>
           </div>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { getTeamDisplayName } from '@/lib/teamMeta'
 
 
 export default function AdminFinalPage() {
@@ -132,7 +133,7 @@ export default function AdminFinalPage() {
             >
               <option value="">Selecciona campeón</option>
               {teams.map((team) => (
-                <option key={team} value={team}>{team}</option>
+                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
               ))}
             </select>
           </div>
@@ -149,7 +150,7 @@ export default function AdminFinalPage() {
             >
               <option value="">Selecciona subcampeón</option>
               {teams.map((team) => (
-                <option key={team} value={team}>{team}</option>
+                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
               ))}
             </select>
           </div>
@@ -166,7 +167,7 @@ export default function AdminFinalPage() {
             >
               <option value="">Selecciona tercer lugar</option>
               {teams.map((team) => (
-                <option key={team} value={team}>{team}</option>
+                <option key={team} value={team}>{getTeamDisplayName(team)}</option>
               ))}
             </select>
           </div>

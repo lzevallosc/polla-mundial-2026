@@ -1,0 +1,57 @@
+export const teamMeta: Record<string, { flag: string }> = {
+  'México': { flag: '🇲🇽' },
+  'Sudáfrica': { flag: '🇿🇦' },
+  'Corea del Sur': { flag: '🇰🇷' },
+  'Chequia': { flag: '🇨🇿' },
+  'Canadá': { flag: '🇨🇦' },
+  'Bosnia y Herzegovina': { flag: '🇧🇦' },
+  'Estados Unidos': { flag: '🇺🇸' },
+  'Paraguay': { flag: '🇵🇾' },
+  'Haití': { flag: '🇭🇹' },
+  'Escocia': { flag: '🏴' },
+  'Australia': { flag: '🇦🇺' },
+  'Türkiye': { flag: '🇹🇷' },
+  'Brasil': { flag: '🇧🇷' },
+  'Marruecos': { flag: '🇲🇦' },
+  'Qatar': { flag: '🇶🇦' },
+  'Suiza': { flag: '🇨🇭' },
+  'Alemania': { flag: '🇩🇪' },
+  'Curazao': { flag: '🇨🇼' },
+  'Países Bajos': { flag: '🇳🇱' },
+  'Japón': { flag: '🇯🇵' },
+  'Costa de Marfil': { flag: '🇨🇮' },
+  'Ecuador': { flag: '🇪🇨' },
+  'Túnez': { flag: '🇹🇳' },
+  'Nueva Zelanda': { flag: '🇳🇿' },
+  'Bélgica': { flag: '🇧🇪' },
+  'Egipto': { flag: '🇪🇬' },
+  'España': { flag: '🇪🇸' },
+  'Cabo Verde': { flag: '🇨🇻' },
+  'Irán': { flag: '🇮🇷' },
+  'Uzbekistán': { flag: '🇺🇿' },
+  'Arabia Saudita': { flag: '🇸🇦' },
+  'Uruguay': { flag: '🇺🇾' },
+  'Argentina': { flag: '🇦🇷' },
+  'Francia': { flag: '🇫🇷' },
+  'Portugal': { flag: '🇵🇹' },
+  'Inglaterra': { flag: '🏴' },
+  'Colombia': { flag: '🇨🇴' },
+  'Croacia': { flag: '🇭🇷' },
+  'Dinamarca': { flag: '🇩🇰' },
+  'Senegal': { flag: '🇸🇳' },
+  'Perú': { flag: '🇵🇪' },
+  'Europe 1': { flag: '🇪🇺' },
+  'Europe 2': { flag: '🇪🇺' },
+  'Europe 3': { flag: '🇪🇺' },
+  'Europe 4': { flag: '🇪🇺' },
+  'IP Path 1': { flag: '🌎' },
+  'IP Path 2': { flag: '🌎' },
+}
+
+export function getTeamFlag(team: string) {
+  return teamMeta[team]?.flag ?? '🏳️'
+}
+
+export function getTeamDisplayName(team: string) {
+  return `${getTeamFlag(team)} ${team}`
+}
