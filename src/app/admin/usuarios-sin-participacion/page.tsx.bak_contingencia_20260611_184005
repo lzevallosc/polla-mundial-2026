@@ -77,34 +77,6 @@ export default function UsersWithoutEntriesPage() {
     setLoading(false)
   }
 
-  async function openContingencyWindow() {
-    const confirmed = window.confirm(
-      'Esto extenderá el cierre de participaciones por 2 horas desde este momento. Los partidos ya iniciados seguirán bloqueados. ¿Deseas continuar?'
-    )
-
-    if (!confirmed) return
-
-    setMessage('')
-
-    const newLockAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
-
-    const { error } = await supabase
-      .from('app_settings')
-      .update({
-        value: newLockAt,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('key', 'entries_lock_at')
-
-    if (error) {
-      setMessage(error.message)
-      return
-    }
-
-    setMessage(`Contingencia activada. Participaciones abiertas hasta: ${new Date(newLockAt).toLocaleString()}`)
-    await loadUsers()
-  }
-
   async function loadUsers() {
     setMessage('')
 
@@ -152,13 +124,6 @@ export default function UsersWithoutEntriesPage() {
               className="rounded-2xl bg-cyan-400 px-5 py-3 font-black text-slate-950 hover:bg-cyan-300"
             >
               Actualizar
-            </button>
-
-            <button
-              onClick={openContingencyWindow}
-              className="rounded-2xl bg-amber-300 px-5 py-3 font-black text-slate-950 hover:bg-amber-200"
-            >
-              Abrir contingencia 2h
             </button>
 
             <button
