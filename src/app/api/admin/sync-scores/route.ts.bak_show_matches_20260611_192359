@@ -1,0 +1,419 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+
+export const dynamic = 'force-dynamic'
+
+type LocalMatch = {
+  id: string
+  match_number: number | null
+  home_team: string
+  away_team: string
+  match_datetime: string
+  api_match_id: number | null
+}
+
+type FootballDataMatch = {
+  id: number
+  utcDate: string
+  status: string
+  homeTeam: {
+    name: string | null
+    shortName?: string | null
+    tla?: string | null
+  }
+  awayTeam: {
+    name: string | null
+    shortName?: string | null
+    tla?: string | null
+  }
+  score: {
+    fullTime?: {
+      home: number | null
+      away: number | null
+    }
+    regularTime?: {
+      home: number | null
+      away: number | null
+    }
+  }
+}
+
+type Prediction = {
+  id: string
+  home_score: number | null
+  away_score: number | null
+}
+
+function normalizeTeam(value: string | null | undefined) {
+  const raw = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const aliases: Record<string, string> = {
+    'mexico': 'mexico',
+    'estados unidos': 'usa',
+    'united states': 'usa',
+    'usa': 'usa',
+
+    'canada': 'canada',
+    'argentina': 'argentina',
+    'brasil': 'brazil',
+    'brazil': 'brazil',
+    'chile': 'chile',
+    'colombia': 'colombia',
+    'ecuador': 'ecuador',
+    'paraguay': 'paraguay',
+    'peru': 'peru',
+    'uruguay': 'uruguay',
+
+    'alemania': 'germany',
+    'germany': 'germany',
+    'espana': 'spain',
+    'spain': 'spain',
+    'francia': 'france',
+    'france': 'france',
+    'inglaterra': 'england',
+    'england': 'england',
+    'italia': 'italy',
+    'italy': 'italy',
+    'paises bajos': 'netherlands',
+    'netherlands': 'netherlands',
+    'holanda': 'netherlands',
+    'portugal': 'portugal',
+    'belgica': 'belgium',
+    'belgium': 'belgium',
+    'croacia': 'croatia',
+    'croatia': 'croatia',
+    'suiza': 'switzerland',
+    'switzerland': 'switzerland',
+    'dinamarca': 'denmark',
+    'denmark': 'denmark',
+
+    'japon': 'japan',
+    'japan': 'japan',
+    'corea del sur': 'south korea',
+    'south korea': 'south korea',
+    'arabia saudita': 'saudi arabia',
+    'saudi arabia': 'saudi arabia',
+    'iran': 'iran',
+    'australia': 'australia',
+    'qatar': 'qatar',
+
+    'marruecos': 'morocco',
+    'morocco': 'morocco',
+    'egipto': 'egypt',
+    'egypt': 'egypt',
+    'senegal': 'senegal',
+    'ghana': 'ghana',
+    'nigeria': 'nigeria',
+    'tunez': 'tunisia',
+    'tunisia': 'tunisia',
+    'sudafrica': 'south africa',
+    'south africa': 'south africa',
+    'costa de marfil': 'ivory coast',
+    'ivory coast': 'ivory coast',
+    'cote d ivoire': 'ivory coast',
+  }
+
+  return aliases[raw] || raw
+}
+
+function getWinner(home: number, away: number) {
+  if (home > away) return 'home'
+  if (away > home) return 'away'
+  return 'draw'
+}
+
+function calculateMatchPoints(
+  predictedHome: number,
+  predictedAway: number,
+  actualHome: number,
+  actualAway: number
+) {
+  let points = 0
+
+  if (getWinner(predictedHome, predictedAway) === getWinner(actualHome, actualAway)) {
+    points += 3
+  }
+
+  if (predictedHome === actualHome) {
+    points += 1
+  }
+
+  if (predictedAway === actualAway) {
+    points += 1
+  }
+
+  if (predictedHome === actualHome && predictedAway === actualAway) {
+    points += 5
+  }
+
+  return points
+}
+
+function getApiScore(match: FootballDataMatch) {
+  const home =
+    match.score?.fullTime?.home ??
+    match.score?.regularTime?.home ??
+    null
+
+  const away =
+    match.score?.fullTime?.away ??
+    match.score?.regularTime?.away ??
+    null
+
+  return { home, away }
+}
+
+function findLocalMatch(apiMatch: FootballDataMatch, localMatches: LocalMatch[]) {
+  const byApiId = localMatches.find((match) => match.api_match_id === apiMatch.id)
+
+  if (byApiId) return byApiId
+
+  const apiHome = normalizeTeam(apiMatch.homeTeam?.name)
+  const apiAway = normalizeTeam(apiMatch.awayTeam?.name)
+  const apiDate = new Date(apiMatch.utcDate).getTime()
+
+  const candidates = localMatches.filter((match) => {
+    if (match.api_match_id) return false
+
+    const localHome = normalizeTeam(match.home_team)
+    const localAway = normalizeTeam(match.away_team)
+    const localDate = new Date(match.match_datetime).getTime()
+    const hoursDiff = Math.abs(localDate - apiDate) / 1000 / 60 / 60
+
+    return (
+      hoursDiff <= 18 &&
+      localHome === apiHome &&
+      localAway === apiAway
+    )
+  })
+
+  if (candidates.length === 1) {
+    return candidates[0]
+  }
+
+  return null
+}
+
+async function recalculatePredictions(
+  supabaseAdmin: SupabaseClient<any>,
+  matchId: string,
+  actualHome: number,
+  actualAway: number
+) {
+  const { data: predictions, error } = await supabaseAdmin
+    .from('predictions')
+    .select('id, home_score, away_score')
+    .eq('match_id', matchId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const updates = ((predictions || []) as Prediction[])
+    .filter((prediction) => prediction.home_score !== null && prediction.away_score !== null)
+    .map((prediction) => {
+      const points = calculateMatchPoints(
+        Number(prediction.home_score),
+        Number(prediction.away_score),
+        actualHome,
+        actualAway
+      )
+
+      return supabaseAdmin
+        .from('predictions')
+        .update({ points })
+        .eq('id', prediction.id)
+    })
+
+  await Promise.all(updates)
+
+  return updates.length
+}
+
+export async function GET(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET
+  const footballToken = process.env.FOOTBALL_DATA_TOKEN
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  const headerSecret = request.headers.get('x-cron-secret')
+  const bearer = request.headers.get('authorization')?.replace('Bearer ', '')
+  const dryRun = request.nextUrl.searchParams.get('dryRun') === '1'
+
+  if (!cronSecret || (headerSecret !== cronSecret && bearer !== cronSecret)) {
+    return NextResponse.json(
+      { ok: false, error: 'No autorizado' },
+      { status: 401 }
+    )
+  }
+
+  if (!footballToken || !supabaseUrl || !serviceRoleKey) {
+    return NextResponse.json(
+      { ok: false, error: 'Faltan variables FOOTBALL_DATA_TOKEN, NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY' },
+      { status: 500 }
+    )
+  }
+
+  const supabaseAdmin = createClient<any>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+    },
+  })
+
+  const apiResponse = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
+    headers: {
+      'X-Auth-Token': footballToken,
+    },
+    cache: 'no-store',
+  })
+
+  if (!apiResponse.ok) {
+    const body = await apiResponse.text()
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `football-data error ${apiResponse.status}`,
+        body,
+      },
+      { status: 502 }
+    )
+  }
+
+  const apiData = await apiResponse.json()
+  const apiMatches = (apiData.matches || []) as FootballDataMatch[]
+
+  const interestingApiMatches = apiMatches.filter((match) =>
+    ['IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status)
+  )
+
+  const { data: localMatches, error: localError } = await supabaseAdmin
+    .from('matches')
+    .select('id, match_number, home_team, away_team, match_datetime, api_match_id')
+    .order('match_datetime', { ascending: true })
+
+  if (localError) {
+    return NextResponse.json(
+      { ok: false, error: localError.message },
+      { status: 500 }
+    )
+  }
+
+  const summary = {
+    dryRun,
+    apiMatches: apiMatches.length,
+    interestingApiMatches: interestingApiMatches.length,
+    mapped: 0,
+    updatedMatches: 0,
+    recalculatedPredictions: 0,
+    skipped: [] as Array<Record<string, unknown>>,
+    updated: [] as Array<Record<string, unknown>>,
+  }
+
+  for (const apiMatch of interestingApiMatches) {
+    const score = getApiScore(apiMatch)
+
+    if (score.home === null || score.away === null) {
+      summary.skipped.push({
+        apiMatchId: apiMatch.id,
+        reason: 'Sin score disponible',
+        status: apiMatch.status,
+        homeTeam: apiMatch.homeTeam?.name,
+        awayTeam: apiMatch.awayTeam?.name,
+      })
+      continue
+    }
+
+    const localMatch = findLocalMatch(apiMatch, (localMatches || []) as LocalMatch[])
+
+    if (!localMatch) {
+      summary.skipped.push({
+        apiMatchId: apiMatch.id,
+        reason: 'No se encontró match local equivalente',
+        status: apiMatch.status,
+        homeTeam: apiMatch.homeTeam?.name,
+        awayTeam: apiMatch.awayTeam?.name,
+        utcDate: apiMatch.utcDate,
+        score,
+      })
+      continue
+    }
+
+    summary.mapped++
+
+    if (dryRun) {
+      summary.updated.push({
+        localMatchId: localMatch.id,
+        apiMatchId: apiMatch.id,
+        status: apiMatch.status,
+        homeTeam: apiMatch.homeTeam?.name,
+        awayTeam: apiMatch.awayTeam?.name,
+        score,
+        action: 'dryRun',
+      })
+      continue
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      api_provider: 'football-data',
+      api_match_id: apiMatch.id,
+      api_synced_at: new Date().toISOString(),
+      home_score: score.home,
+      away_score: score.away,
+    }
+
+    if (apiMatch.status === 'FINISHED') {
+      updatePayload.status = 'finished'
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('matches')
+      .update(updatePayload)
+      .eq('id', localMatch.id)
+
+    if (updateError) {
+      summary.skipped.push({
+        apiMatchId: apiMatch.id,
+        localMatchId: localMatch.id,
+        reason: updateError.message,
+      })
+      continue
+    }
+
+    summary.updatedMatches++
+
+    let recalculated = 0
+
+    if (apiMatch.status === 'FINISHED') {
+      recalculated = await recalculatePredictions(
+        supabaseAdmin,
+        localMatch.id,
+        Number(score.home),
+        Number(score.away)
+      )
+
+      summary.recalculatedPredictions += recalculated
+    }
+
+    summary.updated.push({
+      localMatchId: localMatch.id,
+      apiMatchId: apiMatch.id,
+      status: apiMatch.status,
+      homeTeam: apiMatch.homeTeam?.name,
+      awayTeam: apiMatch.awayTeam?.name,
+      score,
+      recalculated,
+    })
+  }
+
+  return NextResponse.json({
+    ok: true,
+    ...summary,
+  })
+}
