@@ -27,6 +27,7 @@ export default function Navbar() {
           <Link className="transition hover:text-cyan-300" href="/ranking">Ranking</Link>
           <Link className="transition hover:text-cyan-300" href="/reglas">Reglas</Link>
           <Link className="transition hover:text-cyan-300" href="/admin">Admin</Link>
+          <Link className="transition hover:text-cyan-300" href="/admin/scores">Scores</Link>
           <UsersBadge />
           <ScoreBadge />
         </nav>

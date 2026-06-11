@@ -99,8 +99,7 @@ function getStatusClass(label: string) {
 
 function getPredictionPointLabel(match: Match, pred?: Prediction) {
   if (!pred) return 'Sin pronóstico'
-  if (match.home_score === null || match.away_score === null) return 'Pendiente de resultado'
-  if (match.status !== 'finished') return 'Marcador en vivo, puntos pendientes'
+  if (match.status !== 'finished') return 'Pendiente de resultado'
 
   if (
     match.home_score === pred.predicted_home_score &&
@@ -876,7 +875,7 @@ export default function FixturePage() {
                       <TeamCard team={match.away_team} align="left" />
                     </div>
 
-                    {match.home_score !== null && match.away_score !== null && (
+                    {match.status === 'finished' && match.home_score !== null && match.away_score !== null && (
                       <div className="mt-5 rounded-2xl border border-white/10 bg-white/10 p-4 text-center">
                         <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
                           Resultado real
@@ -931,7 +930,7 @@ export default function FixturePage() {
                                 </span>
                               </p>
 
-                              {match.home_score !== null && match.away_score !== null ? (
+                              {match.status === 'finished' && match.home_score !== null && match.away_score !== null ? (
                                 <p>
                                   Resultado real:{' '}
                                   <span className="font-black text-white">

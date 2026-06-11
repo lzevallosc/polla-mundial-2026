@@ -317,50 +317,10 @@ export async function GET(request: NextRequest) {
   }
 
   const apiData = await apiResponse.json()
-  let apiMatches = (apiData.matches || []) as FootballDataMatch[]
-
-  const { data: mappedMatchesForApiIds } = await supabaseAdmin
-    .from('matches')
-    .select('api_match_id')
-    .not('api_match_id', 'is', null)
-    .order('match_datetime', { ascending: true })
-    .limit(40)
-
-  const mappedApiIds = ((mappedMatchesForApiIds || []) as Array<{ api_match_id: number | null }>)
-    .map((match) => match.api_match_id)
-    .filter((id): id is number => typeof id === 'number')
-
-  let directApiMatches: FootballDataMatch[] = []
-
-  if (mappedApiIds.length > 0) {
-    const directResponse = await fetch(
-      `https://api.football-data.org/v4/matches?ids=${mappedApiIds.join(',')}`,
-      {
-        headers: {
-          'X-Auth-Token': footballToken,
-        },
-        cache: 'no-store',
-      }
-    )
-
-    if (directResponse.ok) {
-      const directData = await directResponse.json()
-      directApiMatches = (directData.matches || []) as FootballDataMatch[]
-
-      const directById = new Map(directApiMatches.map((match) => [match.id, match]))
-
-      apiMatches = apiMatches.map((match) => directById.get(match.id) || match)
-
-      for (const match of directApiMatches) {
-        if (!apiMatches.some((item) => item.id === match.id)) {
-          apiMatches.push(match)
-        }
-      }
-    }
-  }
+  const apiMatches = (apiData.matches || []) as FootballDataMatch[]
 
   const interestingApiMatches = apiMatches.filter((match) =>
-    ['LIVE', 'IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status)
+    ['IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status)
   )
 
   const { data: localMatches, error: localError } = await supabaseAdmin
@@ -447,7 +407,6 @@ export async function GET(request: NextRequest) {
   const summary = {
     dryRun,
     apiMatches: apiMatches.length,
-    directApiMatches: directApiMatches.length,
     interestingApiMatches: interestingApiMatches.length,
     nextApiMatches,
     recentApiMatches,

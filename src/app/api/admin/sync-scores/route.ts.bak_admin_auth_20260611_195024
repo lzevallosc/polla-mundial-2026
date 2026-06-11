@@ -240,12 +240,18 @@ export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET
   const footballToken = process.env.FOOTBALL_DATA_TOKEN
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   const headerSecret = request.headers.get('x-cron-secret')
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '')
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1'
+
+  if (!cronSecret || (headerSecret !== cronSecret && bearer !== cronSecret)) {
+    return NextResponse.json(
+      { ok: false, error: 'No autorizado' },
+      { status: 401 }
+    )
+  }
 
   if (!footballToken || !supabaseUrl || !serviceRoleKey) {
     return NextResponse.json(
@@ -259,42 +265,6 @@ export async function GET(request: NextRequest) {
       persistSession: false,
     },
   })
-
-  let authorized = Boolean(cronSecret && headerSecret === cronSecret)
-
-  if (!authorized && bearer && supabaseAnonKey) {
-    const supabaseAuth = createClient<any>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-      },
-    })
-
-    const { data: userData } = await supabaseAuth.auth.getUser(bearer)
-
-    if (userData.user?.id) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('role')
-        .eq('id', userData.user.id)
-        .single()
-
-      authorized = profile?.role === 'admin'
-    }
-  }
-
-  if (!authorized) {
-    return NextResponse.json(
-      { ok: false, error: 'No autorizado' },
-      { status: 401 }
-    )
-  }
-
-  if (!footballToken || !supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json(
-      { ok: false, error: 'Faltan variables FOOTBALL_DATA_TOKEN, NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY' },
-      { status: 500 }
-    )
-  }
 
   const apiResponse = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
     headers: {
@@ -317,50 +287,10 @@ export async function GET(request: NextRequest) {
   }
 
   const apiData = await apiResponse.json()
-  let apiMatches = (apiData.matches || []) as FootballDataMatch[]
-
-  const { data: mappedMatchesForApiIds } = await supabaseAdmin
-    .from('matches')
-    .select('api_match_id')
-    .not('api_match_id', 'is', null)
-    .order('match_datetime', { ascending: true })
-    .limit(40)
-
-  const mappedApiIds = ((mappedMatchesForApiIds || []) as Array<{ api_match_id: number | null }>)
-    .map((match) => match.api_match_id)
-    .filter((id): id is number => typeof id === 'number')
-
-  let directApiMatches: FootballDataMatch[] = []
-
-  if (mappedApiIds.length > 0) {
-    const directResponse = await fetch(
-      `https://api.football-data.org/v4/matches?ids=${mappedApiIds.join(',')}`,
-      {
-        headers: {
-          'X-Auth-Token': footballToken,
-        },
-        cache: 'no-store',
-      }
-    )
-
-    if (directResponse.ok) {
-      const directData = await directResponse.json()
-      directApiMatches = (directData.matches || []) as FootballDataMatch[]
-
-      const directById = new Map(directApiMatches.map((match) => [match.id, match]))
-
-      apiMatches = apiMatches.map((match) => directById.get(match.id) || match)
-
-      for (const match of directApiMatches) {
-        if (!apiMatches.some((item) => item.id === match.id)) {
-          apiMatches.push(match)
-        }
-      }
-    }
-  }
+  const apiMatches = (apiData.matches || []) as FootballDataMatch[]
 
   const interestingApiMatches = apiMatches.filter((match) =>
-    ['LIVE', 'IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status)
+    ['IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status)
   )
 
   const { data: localMatches, error: localError } = await supabaseAdmin
@@ -390,22 +320,7 @@ export async function GET(request: NextRequest) {
       score: getApiScore(match),
     }))
 
-  const recentApiMatches = apiMatches
-    .filter((match) => new Date(match.utcDate).getTime() < now)
-    .sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime())
-    .slice(0, 10)
-    .map((match) => ({
-      apiMatchId: match.id,
-      status: match.status,
-      utcDate: match.utcDate,
-      homeTeam: match.homeTeam?.name,
-      awayTeam: match.awayTeam?.name,
-      score: getApiScore(match),
-    }))
-
-  const localMatchList = ((localMatches || []) as LocalMatch[])
-
-  const nextLocalMatches = localMatchList
+  const nextLocalMatches = ((localMatches || []) as LocalMatch[])
     .filter((match) => new Date(match.match_datetime).getTime() >= now)
     .sort((a, b) => new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime())
     .slice(0, 10)
@@ -418,42 +333,12 @@ export async function GET(request: NextRequest) {
       apiMatchId: match.api_match_id,
     }))
 
-  const recentLocalMatches = localMatchList
-    .filter((match) => new Date(match.match_datetime).getTime() < now)
-    .sort((a, b) => new Date(b.match_datetime).getTime() - new Date(a.match_datetime).getTime())
-    .slice(0, 10)
-    .map((match) => ({
-      localMatchId: match.id,
-      matchNumber: match.match_number,
-      localDate: match.match_datetime,
-      homeTeam: match.home_team,
-      awayTeam: match.away_team,
-      apiMatchId: match.api_match_id,
-    }))
-
-  const mappedLocalMatches = localMatchList
-    .filter((match) => match.api_match_id)
-    .sort((a, b) => Number(a.match_number || 0) - Number(b.match_number || 0))
-    .slice(0, 20)
-    .map((match) => ({
-      localMatchId: match.id,
-      matchNumber: match.match_number,
-      localDate: match.match_datetime,
-      homeTeam: match.home_team,
-      awayTeam: match.away_team,
-      apiMatchId: match.api_match_id,
-    }))
-
   const summary = {
     dryRun,
     apiMatches: apiMatches.length,
-    directApiMatches: directApiMatches.length,
     interestingApiMatches: interestingApiMatches.length,
     nextApiMatches,
-    recentApiMatches,
     nextLocalMatches,
-    recentLocalMatches,
-    mappedLocalMatches,
     mapped: 0,
     updatedMatches: 0,
     recalculatedPredictions: 0,
