@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import ScoreBadge from '@/components/ScoreBadge'
+import UsersBadge from '@/components/UsersBadge'
 
 export default function Navbar() {
   return (
@@ -27,6 +28,7 @@ export default function Navbar() {
           <Link className="transition hover:text-cyan-300" href="/ranking">Ranking</Link>
           <Link className="transition hover:text-cyan-300" href="/reglas">Reglas</Link>
           <Link className="transition hover:text-cyan-300" href="/admin">Admin</Link>
+          <UsersBadge />
           <ScoreBadge />
         </nav>
       </div>
