@@ -86,6 +86,30 @@ function getStatusClass(label: string) {
   return 'bg-amber-400/20 text-amber-100 border-amber-300/20'
 }
 
+function getPredictionPointLabel(match: Match, pred?: Prediction) {
+  if (!pred) return 'Sin pronóstico'
+  if (match.status !== 'finished') return 'Pendiente de resultado'
+
+  if (
+    match.home_score === pred.predicted_home_score &&
+    match.away_score === pred.predicted_away_score
+  ) {
+    return 'Marcador exacto'
+  }
+
+  if (pred.points > 0) return 'Sumaste puntos'
+  return 'Sin puntos'
+}
+
+function getPredictionPointClass(match: Match, pred?: Prediction) {
+  if (!pred) return 'border-white/10 bg-white/10 text-slate-300'
+  if (match.status !== 'finished') return 'border-amber-300/20 bg-amber-400/10 text-amber-100'
+  if (pred.points >= 10) return 'border-emerald-300/30 bg-emerald-400 text-slate-950'
+  if (pred.points > 0) return 'border-cyan-300/30 bg-cyan-400 text-slate-950'
+  return 'border-red-300/20 bg-red-400/10 text-red-100'
+}
+
+
 function getCloseText(match: Match) {
   if (match.status === 'finished') return 'Resultado cargado'
 
@@ -464,20 +488,64 @@ export default function FixturePage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-sm text-slate-300">
-                        {pred
-                          ? `Guardado: ${pred.predicted_home_score} - ${pred.predicted_away_score} · Puntos: ${pred.points}`
-                          : 'Sin pronóstico'}
-                      </p>
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+                            Resumen del partido
+                          </p>
 
-                      <button
-                        disabled={isClosed || savingMatchId === match.id}
-                        onClick={() => savePrediction(match)}
-                        className="rounded-2xl bg-cyan-400 px-6 py-3 font-black text-slate-950 shadow-lg hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-500"
-                      >
-                        {savingMatchId === match.id ? 'Guardando...' : isClosed ? 'Cerrado' : 'Guardar'}
-                      </button>
+                          {pred ? (
+                            <div className="mt-2 space-y-1 text-sm text-slate-200">
+                              <p>
+                                Tu pronóstico:{' '}
+                                <span className="font-black text-white">
+                                  {pred.predicted_home_score} - {pred.predicted_away_score}
+                                </span>
+                              </p>
+
+                              {match.status === 'finished' && match.home_score !== null && match.away_score !== null ? (
+                                <p>
+                                  Resultado real:{' '}
+                                  <span className="font-black text-white">
+                                    {match.home_score} - {match.away_score}
+                                  </span>
+                                </p>
+                              ) : (
+                                <p className="text-slate-400">
+                                  Resultado real pendiente.
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-slate-300">
+                              Todavía no guardaste pronóstico para este partido.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:items-end">
+                          <div className={`min-w-36 rounded-2xl border px-5 py-3 text-center shadow ${getPredictionPointClass(match, pred)}`}>
+                            <p className="text-xs font-black uppercase tracking-widest">
+                              Puntos
+                            </p>
+                            <p className="text-4xl font-black">
+                              {pred ? pred.points : 0}
+                            </p>
+                            <p className="text-xs font-bold">
+                              {getPredictionPointLabel(match, pred)}
+                            </p>
+                          </div>
+
+                          <button
+                            disabled={isClosed || savingMatchId === match.id}
+                            onClick={() => savePrediction(match)}
+                            className="rounded-2xl bg-cyan-400 px-6 py-3 font-black text-slate-950 shadow-lg hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-500"
+                          >
+                            {savingMatchId === match.id ? 'Guardando...' : isClosed ? 'Cerrado' : pred ? 'Actualizar' : 'Guardar'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </article>
