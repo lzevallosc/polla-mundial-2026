@@ -47,6 +47,13 @@ export const teamMeta: Record<string, TeamMeta> = {
   'Dinamarca': { code: 'DK', flagUrl: makeFlag('DK') },
   'Senegal': { code: 'SN', flagUrl: makeFlag('SN') },
   'Perú': { code: 'PE', flagUrl: makeFlag('PE') },
+  'Noruega': { code: 'NO', flagUrl: makeFlag('NO') },
+  'Argelia': { code: 'DZ', flagUrl: makeFlag('DZ') },
+  'Austria': { code: 'AT', flagUrl: makeFlag('AT') },
+  'Jordania': { code: 'JO', flagUrl: makeFlag('JO') },
+  'Ghana': { code: 'GH', flagUrl: makeFlag('GH') },
+  'Panamá': { code: 'PA', flagUrl: makeFlag('PA') },
+
 
   'Escocia': { code: 'SCO', fallbackType: 'badge' },
   'Inglaterra': { code: 'ENG', fallbackType: 'badge' },
