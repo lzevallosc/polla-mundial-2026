@@ -20,21 +20,10 @@ type Match = {
 }
 
 type Prediction = {
-  id: number
-  entry_id: string | null
   match_id: number
   predicted_home_score: number
   predicted_away_score: number
   points: number
-}
-
-
-type Entry = {
-  id: string
-  user_id: string
-  name: string
-  category: string
-  is_active: boolean
 }
 
 type ScoreDraft = {
@@ -144,7 +133,6 @@ function getCloseText(match: Match) {
 export default function FixturePage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
-  const [activeEntry, setActiveEntry] = useState<Entry | null>(null)
   const [matches, setMatches] = useState<Match[]>([])
   const [predictions, setPredictions] = useState<Record<number, Prediction>>({})
   const [scores, setScores] = useState<Record<number, ScoreDraft>>({})
@@ -346,66 +334,21 @@ export default function FixturePage() {
       return
     }
 
-    let activeEntryId: string | null = null
-    let nextActiveEntry: Entry | null = null
     let predictionsData: Prediction[] = []
 
     if (currentUserId) {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('active_entry_id')
-        .eq('id', currentUserId)
-        .single()
-
-      if (profileError) {
-        setMessage(profileError.message)
-        setLoading(false)
-        return
-      }
-
-      const { data: entriesData, error: entriesError } = await supabase
-        .from('entries')
-        .select('id, user_id, name, category, is_active')
+      const { data, error } = await supabase
+        .from('predictions')
+        .select('*')
         .eq('user_id', currentUserId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
 
-      if (entriesError) {
-        setMessage(entriesError.message)
+      if (error) {
+        setMessage(error.message)
         setLoading(false)
         return
       }
 
-      const userEntries = (entriesData || []) as Entry[]
-
-      nextActiveEntry =
-        userEntries.find((entry) => entry.id === profileData?.active_entry_id) ||
-        userEntries[0] ||
-        null
-
-      activeEntryId = nextActiveEntry?.id || null
-
-      if (activeEntryId && profileData?.active_entry_id !== activeEntryId) {
-        await supabase
-          .from('profiles')
-          .update({ active_entry_id: activeEntryId })
-          .eq('id', currentUserId)
-      }
-
-      if (activeEntryId) {
-        const { data, error } = await supabase
-          .from('predictions')
-          .select('id, entry_id, match_id, predicted_home_score, predicted_away_score, points')
-          .eq('entry_id', activeEntryId)
-
-        if (error) {
-          setMessage(error.message)
-          setLoading(false)
-          return
-        }
-
-        predictionsData = (data || []) as Prediction[]
-      }
+      predictionsData = (data || []) as Prediction[]
     }
 
     const predictionsByMatch: Record<number, Prediction> = {}
@@ -427,7 +370,6 @@ export default function FixturePage() {
     })
 
     setMatches((matchesData || []) as Match[])
-    setActiveEntry(nextActiveEntry)
     setPredictions(predictionsByMatch)
     setScores(nextScores)
     setLoading(false)
@@ -456,11 +398,6 @@ export default function FixturePage() {
   async function savePrediction(match: Match) {
     if (!userId) {
       router.push('/register?next=/fixture')
-      return
-    }
-
-    if (!activeEntry) {
-      router.push('/mis-participaciones')
       return
     }
 
@@ -495,33 +432,26 @@ export default function FixturePage() {
     setSavingMatchId(match.id)
     setMessage('')
 
-    const existingPrediction = predictions[match.id]
+    const { error } = await supabase.from('predictions').upsert(
+      {
+        user_id: userId,
+        match_id: match.id,
+        predicted_home_score: home,
+        predicted_away_score: away,
+        points: 0,
+      },
+      {
+        onConflict: 'user_id,match_id',
+      }
+    )
 
-    const payload = {
-      user_id: userId,
-      entry_id: activeEntry.id,
-      match_id: match.id,
-      predicted_home_score: home,
-      predicted_away_score: away,
-      points: existingPrediction?.points || 0,
-    }
-
-    const result = existingPrediction?.id
-      ? await supabase
-          .from('predictions')
-          .update(payload)
-          .eq('id', existingPrediction.id)
-      : await supabase
-          .from('predictions')
-          .insert(payload)
-
-    if (result.error) {
-      setMessage(result.error.message)
+    if (error) {
+      setMessage(error.message)
       setSavingMatchId(null)
       return
     }
 
-    setMessage(`Pronóstico guardado para ${activeEntry.name}: ${match.home_team} ${home} - ${away} ${match.away_team}`)
+    setMessage(`Pronóstico guardado: ${match.home_team} ${home} - ${away} ${match.away_team}`)
     setSavingMatchId(null)
     await loadData()
   }
@@ -530,7 +460,6 @@ export default function FixturePage() {
     await supabase.auth.signOut()
     setUserId(null)
     setPredictions({})
-    setActiveEntry(null)
     setMessage('Sesión cerrada. Puedes seguir viendo el fixture.')
     await loadData()
   }
@@ -622,57 +551,6 @@ export default function FixturePage() {
                 Registrarme
               </button>
             </div>
-          </div>
-        </section>
-      )}
-
-
-      {userId && activeEntry && (
-        <section className="mb-6 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
-                Participación activa
-              </p>
-              <p className="mt-2 text-lg font-black text-white">
-                {activeEntry.name}
-                <span className="ml-2 rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-950">
-                  {activeEntry.category}
-                </span>
-              </p>
-              <p className="mt-1 text-sm text-cyan-50/80">
-                Los pronósticos que guardes se asociarán a esta participación.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/mis-participaciones')}
-              className="w-fit rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
-            >
-              Cambiar participación
-            </button>
-          </div>
-        </section>
-      )}
-
-      {userId && !activeEntry && (
-        <section className="mb-6 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-amber-200">
-                Necesitas una participación
-              </p>
-              <p className="mt-2 text-sm leading-6 text-amber-50/90">
-                Para guardar pronósticos debes crear o seleccionar una participación.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/mis-participaciones')}
-              className="w-fit rounded-2xl bg-amber-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-200"
-            >
-              Crear participación
-            </button>
           </div>
         </section>
       )}
