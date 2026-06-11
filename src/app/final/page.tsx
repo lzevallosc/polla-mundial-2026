@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabaseClient'
 import TeamSelector from '@/components/TeamSelector'
 import { getTeamFlag } from '@/lib/teamMeta'
 
+const FINAL_PREDICTION_DEADLINE = new Date('2026-06-11T19:00:00Z')
+
 type FinalPrediction = {
   champion: string | null
   runner_up: string | null
@@ -26,6 +28,7 @@ export default function FinalPredictionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentPrediction, setCurrentPrediction] = useState<FinalPrediction | null>(null)
+  const isFinalPredictionClosed = new Date() >= FINAL_PREDICTION_DEADLINE
 
   useEffect(() => {
     loadData()
@@ -77,6 +80,11 @@ export default function FinalPredictionPage() {
     setMessage('')
 
     if (!userId) return
+
+    if (isFinalPredictionClosed) {
+      setMessage('La predicción final ya está cerrada porque el torneo ya empezó.')
+      return
+    }
 
     if (!champion || !runnerUp || !thirdPlace) {
       setMessage('Debes seleccionar campeón, subcampeón y tercer lugar.')
@@ -139,6 +147,16 @@ export default function FinalPredictionPage() {
       </section>
 
       <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
+        <div className={`mb-6 rounded-2xl border p-4 text-sm font-semibold ${
+          isFinalPredictionClosed
+            ? 'border-red-300/20 bg-red-400/10 text-red-100'
+            : 'border-emerald-300/20 bg-emerald-400/10 text-emerald-100'
+        }`}>
+          {isFinalPredictionClosed
+            ? 'Predicción final cerrada. Ya no se puede modificar.'
+            : 'Predicción final abierta. Puedes modificarla hasta antes del inicio del Mundial.'}
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <TeamSelector
             label="Campeón"
@@ -174,7 +192,7 @@ export default function FinalPredictionPage() {
           )}
 
           <button
-            disabled={saving}
+            disabled={saving || isFinalPredictionClosed}
             className="w-full rounded-2xl bg-cyan-400 p-4 font-black text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
           >
             {saving ? 'Guardando...' : 'Guardar predicción final'}
