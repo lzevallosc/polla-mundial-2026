@@ -35,7 +35,6 @@ export default function MyEntriesPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [allEntries, setAllEntries] = useState<Entry[]>([])
-  const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [maxEntries, setMaxEntries] = useState(3)
   const [entriesLockAt, setEntriesLockAt] = useState('2026-06-11T19:00:00Z')
@@ -57,39 +56,16 @@ export default function MyEntriesPage() {
   }, [])
 
   const categoryStats = useMemo(() => {
-    const profileById = allProfiles.reduce<Record<string, Profile>>((acc, item) => {
-      acc[item.id] = item
-      return acc
-    }, {})
-
     return categories.map((cat) => {
-      const categoryEntries = allEntries.filter(
-        (entry) => entry.category === cat.name && entry.is_active
-      )
-
-      const uniqueUsers = new Set(categoryEntries.map((entry) => entry.user_id))
-
-      const participants = categoryEntries
-        .map((entry) => {
-          const entryProfile = profileById[entry.user_id]
-
-          return {
-            id: entry.id,
-            entryName: entry.name,
-            userName: entryProfile?.alias || entryProfile?.full_name || 'Participante',
-          }
-        })
-        .sort((a, b) => a.entryName.localeCompare(b.entryName))
+      const count = allEntries.filter((entry) => entry.category === cat.name && entry.is_active).length
 
       return {
         name: cat.name,
         description: cat.description,
-        count: categoryEntries.length,
-        usersCount: uniqueUsers.size,
-        participants,
+        count,
       }
     })
-  }, [categories, allEntries, allProfiles])
+  }, [categories, allEntries])
 
   const activeEntry = useMemo(() => {
     return entries.find((entry) => entry.id === profile?.active_entry_id) || entries[0] || null
@@ -179,16 +155,6 @@ export default function MyEntriesPage() {
       return
     }
 
-    const { data: profilesData, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, full_name, alias, active_entry_id')
-
-    if (profilesError) {
-      setMessage(profilesError.message)
-      setLoading(false)
-      return
-    }
-
     const nextCategories = (categoriesData || []) as Category[]
     const nextEntries = (entriesData || []) as Entry[]
     const nextProfile = profileData as Profile
@@ -197,7 +163,6 @@ export default function MyEntriesPage() {
     setCategories(nextCategories)
     setEntries(nextEntries)
     setAllEntries((allEntriesData || []) as Entry[])
-    setAllProfiles((profilesData || []) as Profile[])
     setMaxEntries(nextMaxEntries)
     setEntriesLockAt(nextEntriesLockAt)
     setEntriesAreOpen(nextEntriesAreOpen)
@@ -461,7 +426,7 @@ export default function MyEntriesPage() {
         <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400 p-5 text-slate-950 shadow-xl">
           <p className="text-xs font-black uppercase tracking-widest">Tus participaciones</p>
           <p className="mt-2 text-5xl font-black">{entries.length}</p>
-          <p className="mt-1 text-sm font-bold">Tuyas · límite {maxEntries}</p>
+          <p className="mt-1 text-sm font-bold">Límite: {maxEntries}</p>
         </div>
 
         {categoryStats.map((stat) => (
@@ -471,73 +436,10 @@ export default function MyEntriesPage() {
             </p>
             <p className="mt-2 text-4xl font-black text-white">{stat.count}</p>
             <p className="mt-1 text-xs text-slate-300">
-              participaciones globales
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              {stat.usersCount} usuarios
+              participaciones activas
             </p>
           </div>
         ))}
-      </section>
-
-
-      <section className="mb-8 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-xl">
-        <div className="mb-5">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">
-            Participantes por categoría
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-white">
-            Distribución global
-          </h2>
-          <p className="mt-1 text-sm text-slate-300">
-            Aquí ves cuántas participaciones hay en cada categoría y cuáles son. Esto te ayuda a decidir dónde competir.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {categoryStats.map((stat) => (
-            <div key={stat.name} className="rounded-3xl border border-white/10 bg-slate-950/30 p-5">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">
-                    {stat.name}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {stat.count} participaciones · {stat.usersCount} usuarios
-                  </p>
-                </div>
-
-                <span className="rounded-2xl bg-cyan-400 px-3 py-2 text-xl font-black text-slate-950">
-                  {stat.count}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {stat.participants.length === 0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-3 text-sm text-slate-400">
-                    Sin participaciones todavía.
-                  </div>
-                )}
-
-                {stat.participants.slice(0, 8).map((participant) => (
-                  <div
-                    key={participant.id}
-                    className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"
-                  >
-                    <p className="font-black text-white">{participant.entryName}</p>
-                    <p className="text-xs text-slate-400">Usuario: {participant.userName}</p>
-                  </div>
-                ))}
-
-                {stat.participants.length > 8 && (
-                  <div className="rounded-2xl bg-white/[0.04] p-3 text-sm font-bold text-cyan-200">
-                    +{stat.participants.length - 8} participaciones más
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
       </section>
 
       <section className="mb-8 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-xl">
