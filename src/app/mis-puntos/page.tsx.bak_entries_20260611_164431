@@ -5,14 +5,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getTeamCode, getTeamFlagUrl, hasImageFlag } from '@/lib/teamMeta'
 
-type Entry = {
-  id: string
-  user_id: string
-  name: string
-  category: string
-  is_active: boolean
-}
-
 type Match = {
   id: number
   match_number: number
@@ -28,7 +20,6 @@ type Match = {
 
 type Prediction = {
   id: number
-  entry_id: string | null
   match_id: number
   predicted_home_score: number
   predicted_away_score: number
@@ -36,7 +27,6 @@ type Prediction = {
 }
 
 type FinalPrediction = {
-  entry_id: string | null
   champion: string | null
   runner_up: string | null
   third_place: string | null
@@ -71,8 +61,6 @@ function TeamMini({ team }: { team: string }) {
 
 export default function MyPointsPage() {
   const router = useRouter()
-
-  const [activeEntry, setActiveEntry] = useState<Entry | null>(null)
   const [matches, setMatches] = useState<Match[]>([])
   const [predictions, setPredictions] = useState<Prediction[]>([])
   const [finalPrediction, setFinalPrediction] = useState<FinalPrediction | null>(null)
@@ -91,74 +79,22 @@ export default function MyPointsPage() {
   }, [matches])
 
   const matchPoints = predictions.reduce((sum, item) => sum + (item.points || 0), 0)
-
   const extraPoints = finalPrediction
     ? finalPrediction.champion_points +
       finalPrediction.runner_up_points +
       finalPrediction.third_place_points
     : 0
-
   const total = matchPoints + extraPoints
 
   async function loadData() {
-    setLoading(true)
-    setMessage('')
-
     const { data: sessionData } = await supabase.auth.getSession()
 
     if (!sessionData.session?.user) {
-      router.push('/login?next=/mis-puntos')
+      router.push('/login')
       return
     }
 
     const userId = sessionData.session.user.id
-
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('active_entry_id')
-      .eq('id', userId)
-      .single()
-
-    if (profileError) {
-      setMessage(profileError.message)
-      setLoading(false)
-      return
-    }
-
-    const { data: entriesData, error: entriesError } = await supabase
-      .from('entries')
-      .select('id, user_id, name, category, is_active')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true })
-
-    if (entriesError) {
-      setMessage(entriesError.message)
-      setLoading(false)
-      return
-    }
-
-    const entries = (entriesData || []) as Entry[]
-
-    const entry =
-      entries.find((item) => item.id === profileData?.active_entry_id) ||
-      entries[0] ||
-      null
-
-    if (!entry) {
-      setActiveEntry(null)
-      setLoading(false)
-      return
-    }
-
-    if (profileData?.active_entry_id !== entry.id) {
-      await supabase
-        .from('profiles')
-        .update({ active_entry_id: entry.id })
-        .eq('id', userId)
-    }
-
-    setActiveEntry(entry)
 
     const { data: matchesData, error: matchesError } = await supabase
       .from('matches')
@@ -173,8 +109,8 @@ export default function MyPointsPage() {
 
     const { data: predictionsData, error: predictionsError } = await supabase
       .from('predictions')
-      .select('id, entry_id, match_id, predicted_home_score, predicted_away_score, points')
-      .eq('entry_id', entry.id)
+      .select('*')
+      .eq('user_id', userId)
       .order('match_id', { ascending: true })
 
     if (predictionsError) {
@@ -183,17 +119,11 @@ export default function MyPointsPage() {
       return
     }
 
-    const { data: finalData, error: finalError } = await supabase
+    const { data: finalData } = await supabase
       .from('final_predictions')
-      .select('entry_id, champion, runner_up, third_place, champion_points, runner_up_points, third_place_points')
-      .eq('entry_id', entry.id)
+      .select('*')
+      .eq('user_id', userId)
       .maybeSingle()
-
-    if (finalError) {
-      setMessage(finalError.message)
-      setLoading(false)
-      return
-    }
 
     setMatches((matchesData || []) as Match[])
     setPredictions((predictionsData || []) as Prediction[])
@@ -219,57 +149,9 @@ export default function MyPointsPage() {
         </p>
         <h1 className="text-4xl font-black text-white">Mis puntos</h1>
         <p className="mt-2 text-slate-300">
-          Revisa el score total y el detalle de puntos de tu participación activa.
+          Revisa tu score total y el detalle de puntos por cada partido.
         </p>
       </section>
-
-      {activeEntry ? (
-        <section className="mb-6 rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300">
-                Participación activa
-              </p>
-              <p className="mt-2 text-lg font-black text-white">
-                {activeEntry.name}
-                <span className="ml-2 rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-950">
-                  {activeEntry.category}
-                </span>
-              </p>
-              <p className="mt-1 text-sm text-cyan-50/80">
-                Estos puntos pertenecen solo a esta participación.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/mis-participaciones')}
-              className="w-fit rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
-            >
-              Cambiar participación
-            </button>
-          </div>
-        </section>
-      ) : (
-        <section className="mb-6 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-5 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-amber-200">
-                Necesitas una participación
-              </p>
-              <p className="mt-2 text-sm leading-6 text-amber-50/90">
-                Para ver tus puntos debes crear o seleccionar una participación.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/mis-participaciones')}
-              className="w-fit rounded-2xl bg-amber-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-200"
-            >
-              Crear participación
-            </button>
-          </div>
-        </section>
-      )}
 
       {message && (
         <div className="mb-6 rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">
@@ -327,7 +209,7 @@ export default function MyPointsPage() {
           <div>
             <h2 className="text-xl font-black text-white">Detalle por partido</h2>
             <p className="text-sm text-slate-300">
-              Se muestran los pronósticos guardados para la participación activa.
+              Se muestran tus pronósticos guardados. Los puntos cambian cuando el admin carga el resultado real.
             </p>
           </div>
         </div>
@@ -335,7 +217,7 @@ export default function MyPointsPage() {
         <div className="space-y-3">
           {predictions.length === 0 && (
             <div className="rounded-2xl bg-slate-950/40 p-4 text-slate-300">
-              Todavía no tienes pronósticos guardados para esta participación.
+              Todavía no tienes pronósticos guardados.
             </div>
           )}
 
