@@ -1,161 +1,352 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import Link from 'next/link'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+type Category = {
+  id: number
+  name: string
+  description: string | null
+  sort_order: number
+  is_active: boolean
+}
+
+type Entry = {
+  id: string
+  user_id: string
+  name: string
+  category: string
+  is_active: boolean
+}
+
 export default function RegisterPage() {
   const router = useRouter()
+
   const [fullName, setFullName] = useState('')
   const [alias, setAlias] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [entryName, setEntryName] = useState('')
+  const [entryCategory, setEntryCategory] = useState('Junior')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [nextUrl, setNextUrl] = useState('/fixture')
+  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-    setLoading(true)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNextUrl(params.get('next') || '/fixture')
+    loadCategories()
+  }, [])
 
-    try {
-      if (!fullName.trim()) {
-        setError('Ingresa tu nombre completo.')
-        setLoading(false)
-        return
-      }
+  const suggestedEntryName = useMemo(() => {
+    const base = alias.trim() || fullName.trim() || 'Mi participación'
+    return `${base} 1`
+  }, [alias, fullName])
 
-      if (!email.trim()) {
-        setError('Ingresa tu correo.')
-        setLoading(false)
-        return
-      }
+  async function loadCategories() {
+    const { data, error } = await supabase
+      .from('entry_categories')
+      .select('id, name, description, sort_order, is_active')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
 
-      if (password.length < 6) {
-        setError('La contraseña debe tener mínimo 6 caracteres.')
-        setLoading(false)
-        return
-      }
+    if (error) {
+      setMessage(error.message)
+      return
+    }
 
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-      })
+    const nextCategories = (data || []) as Category[]
+    setCategories(nextCategories)
 
-      if (signUpError) {
-        console.error('Supabase signUp error:', signUpError)
-        setError(`Error creando usuario: ${signUpError.message}`)
-        setLoading(false)
-        return
-      }
-
-      if (!data.user) {
-        console.error('Supabase signUp without user:', data)
-        setError('Supabase no devolvió usuario. Revisa si el registro está habilitado en Authentication.')
-        setLoading(false)
-        return
-      }
-
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: data.user.id,
-        full_name: fullName.trim(),
-        alias: alias.trim() || fullName.trim(),
-        role: 'user',
-      })
-
-      if (profileError) {
-        console.error('Profile insert error:', profileError)
-        setError(`Usuario creado, pero falló profile: ${profileError.message}`)
-        setLoading(false)
-        return
-      }
-
-      setSuccess('Usuario creado correctamente. Redirigiendo al fixture...')
-      setTimeout(() => {
-        router.push('/fixture')
-      }, 800)
-    } catch (err) {
-      console.error('Unexpected register error:', err)
-      setError('Error inesperado registrando usuario. Revisa la consola del navegador.')
-    } finally {
-      setLoading(false)
+    if (nextCategories.length > 0) {
+      setEntryCategory(nextCategories[0].name)
     }
   }
 
+  async function ensureInitialEntry(userId: string, cleanAlias: string, cleanFullName: string) {
+    const finalEntryName = entryName.trim() || suggestedEntryName
+    const finalCategory = entryCategory || 'Junior'
+
+    const { data: entriesData, error: entriesError } = await supabase
+      .from('entries')
+      .select('id, user_id, name, category, is_active')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+
+    if (entriesError) {
+      throw new Error(entriesError.message)
+    }
+
+    const entries = (entriesData || []) as Entry[]
+    let firstEntry = entries[0] || null
+
+    if (!firstEntry) {
+      const { data: insertedEntry, error: insertEntryError } = await supabase
+        .from('entries')
+        .insert({
+          user_id: userId,
+          name: finalEntryName,
+          category: finalCategory,
+        })
+        .select('id, user_id, name, category, is_active')
+        .single()
+
+      if (insertEntryError) {
+        throw new Error(insertEntryError.message)
+      }
+
+      firstEntry = insertedEntry as Entry
+    } else {
+      const { data: updatedEntry, error: updateEntryError } = await supabase
+        .from('entries')
+        .update({
+          name: finalEntryName,
+          category: finalCategory,
+        })
+        .eq('id', firstEntry.id)
+        .select('id, user_id, name, category, is_active')
+        .single()
+
+      if (updateEntryError) {
+        throw new Error(updateEntryError.message)
+      }
+
+      firstEntry = updatedEntry as Entry
+    }
+
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({
+        active_entry_id: firstEntry.id,
+      })
+      .eq('id', userId)
+
+    if (profileUpdateError) {
+      throw new Error(profileUpdateError.message)
+    }
+
+    return firstEntry
+  }
+
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoading(true)
+    setMessage('')
+
+    const cleanFullName = fullName.trim()
+    const cleanAlias = alias.trim()
+    const cleanEntryName = entryName.trim() || suggestedEntryName
+
+    if (!cleanFullName || !cleanAlias || !email.trim() || !password) {
+      setMessage('Completa nombre, alias, correo y contraseña.')
+      setLoading(false)
+      return
+    }
+
+    if (cleanEntryName.length < 2) {
+      setMessage('Ingresa un nombre válido para tu participación.')
+      setLoading(false)
+      return
+    }
+
+    if (!entryCategory) {
+      setMessage('Selecciona una categoría para tu primera participación.')
+      setLoading(false)
+      return
+    }
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    })
+
+    if (signUpError) {
+      setMessage(signUpError.message)
+      setLoading(false)
+      return
+    }
+
+    const userId = signUpData.user?.id
+
+    if (!userId) {
+      setMessage('No se pudo crear el usuario. Intenta nuevamente.')
+      setLoading(false)
+      return
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          full_name: cleanFullName,
+          alias: cleanAlias,
+          role: 'user',
+        },
+        {
+          onConflict: 'id',
+        }
+      )
+
+    if (profileError) {
+      setMessage(profileError.message)
+      setLoading(false)
+      return
+    }
+
+    try {
+      await ensureInitialEntry(userId, cleanAlias, cleanFullName)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+      setLoading(false)
+      return
+    }
+
+    router.push(nextUrl)
+    router.refresh()
+  }
+
   return (
-    <main className="mx-auto max-w-md px-4 py-10">
-      <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
-        <h1 className="mb-6 text-3xl font-black text-white">Registro</h1>
+    <main className="mx-auto flex min-h-[70vh] max-w-6xl items-start justify-center px-4 py-12">
+      <section className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
+        <div className="mb-6">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-300">
+            Crear cuenta
+          </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4" suppressHydrationWarning autoComplete="off">
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">Nombre completo</label>
-            <input
-              className="w-full rounded-xl p-3"
-              placeholder="Ejemplo: Luis Zevallos" autoComplete="off" data-lpignore="true"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
-          </div>
+          <h1 className="text-3xl font-black text-white md:text-4xl">
+            Registrarme
+          </h1>
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">Alias para ranking</label>
-            <input
-              className="w-full rounded-xl p-3"
-              placeholder="Ejemplo: Luis" autoComplete="off" data-lpignore="true"
-              value={alias}
-              onChange={(e) => setAlias(e.target.value)}
-            />
-          </div>
+          <p className="mt-2 text-sm text-slate-300">
+            Crea tu usuario y define tu primera participación. Puedes elegir Junior,
+            Amateur o Experto desde el inicio.
+          </p>
+        </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">Correo</label>
-            <input
-              className="w-full rounded-xl p-3"
-              type="email"
-              placeholder="correo@dominio.com" autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+        <form onSubmit={handleRegister} className="space-y-6">
+          <section className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <h2 className="mb-4 text-lg font-black text-white">Datos del usuario</h2>
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-200">Contraseña</label>
-            <input
-              className="w-full rounded-xl p-3"
-              type="password"
-              placeholder="Mínimo 6 caracteres" autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <input
+                type="text"
+                placeholder="Nombre completo"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none"
+              />
 
-          {error && (
-            <div className="rounded-xl border border-red-400/40 bg-red-500/20 p-3 text-sm text-red-100">
-              {error}
+              <input
+                type="text"
+                placeholder="Alias"
+                value={alias}
+                onChange={(event) => setAlias(event.target.value)}
+                required
+                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none"
+              />
+
+              <input
+                type="email"
+                placeholder="Correo"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none"
+              />
+
+              <input
+                type="password"
+                placeholder="Contraseña"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none"
+              />
             </div>
-          )}
+          </section>
 
-          {success && (
-            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/20 p-3 text-sm text-emerald-100">
-              {success}
+          <section className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
+            <h2 className="mb-2 text-lg font-black text-white">Primera participación</h2>
+
+            <p className="mb-4 text-sm text-cyan-50/90">
+              Esta será tu participación activa inicial. Luego podrás crear más participaciones
+              hasta el límite permitido.
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
+              <div>
+                <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
+                  Nombre de participación
+                </label>
+
+                <input
+                  type="text"
+                  placeholder={suggestedEntryName}
+                  value={entryName}
+                  onChange={(event) => setEntryName(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none"
+                />
+
+                <p className="mt-2 text-xs text-cyan-50/80">
+                  Si lo dejas vacío se usará: <b>{suggestedEntryName}</b>
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-cyan-200">
+                  Categoría
+                </label>
+
+                <select
+                  value={entryCategory}
+                  onChange={(event) => setEntryCategory(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none"
+                >
+                  {categories.length === 0 && (
+                    <option value="Junior">Junior</option>
+                  )}
+
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {message && (
+            <div className="rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">
+              {message}
             </div>
           )}
 
           <button
+            type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-cyan-400 p-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-60"
+            className="w-full rounded-xl bg-cyan-400 px-4 py-3 font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Registrando...' : 'Crear cuenta'}
+            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 text-center text-sm text-slate-200">
+            ¿Ya tienes cuenta?{' '}
+            <Link
+              href={`/login?next=${encodeURIComponent(nextUrl)}`}
+              className="font-black text-cyan-300 hover:text-cyan-200"
+            >
+              Inicia sesión aquí
+            </Link>
+          </div>
         </form>
-      </div>
+      </section>
     </main>
   )
 }
