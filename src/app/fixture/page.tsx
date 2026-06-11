@@ -358,6 +358,9 @@ export default function FixturePage() {
   async function logout() {
     await supabase.auth.signOut()
     setUserId(null)
+    setPredictions({})
+    setMessage('Sesión cerrada. Puedes seguir viendo el fixture.')
+    await loadData()
   }
 
   if (loading) {
@@ -390,12 +393,30 @@ export default function FixturePage() {
               </p>
             </div>
 
-            <button
-              onClick={logout}
-              className="rounded-2xl border border-white/20 px-5 py-3 text-sm font-bold text-white hover:bg-white/10"
-            >
-              Cerrar sesión
-            </button>
+            {userId ? (
+              <button
+                onClick={logout}
+                className="rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
+              >
+                Cerrar sesión
+              </button>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => router.push('/login?next=/fixture')}
+                  className="rounded-2xl border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
+                >
+                  Iniciar sesión
+                </button>
+
+                <button
+                  onClick={() => router.push('/register?next=/fixture')}
+                  className="rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-300"
+                >
+                  Registrarme
+                </button>
+              </div>
+            )}
           </div>
         </div>
           <div className="mt-5">
