@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { getTeamFlag } from '@/lib/teamMeta'
+import { getTeamCode, getTeamFlagUrl, hasImageFlag } from '@/lib/teamMeta'
 
 type Match = {
   id: number
@@ -31,16 +31,45 @@ type ScoreDraft = {
   away: string
 }
 
-function TeamPill({ team, align = 'left' }: { team: string; align?: 'left' | 'right' }) {
+function TeamFlag({ team, size = 'md' }: { team: string; size?: 'sm' | 'md' | 'lg' }) {
+  const flagUrl = getTeamFlagUrl(team)
+  const code = getTeamCode(team)
+
+  const sizeClass = {
+    sm: 'h-8 w-8 text-[10px]',
+    md: 'h-12 w-12 text-xs',
+    lg: 'h-16 w-16 text-sm',
+  }[size]
+
+  if (hasImageFlag(team) && flagUrl) {
+    return (
+      <div className={`${sizeClass} flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-2 ring-white/20`}>
+        <img
+          src={flagUrl}
+          alt={team}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={`flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-white shadow-sm ${
-        align === 'right' ? 'justify-end text-right' : 'justify-start'
-      }`}
-    >
-      {align === 'right' && <span className="font-bold">{team}</span>}
-      <span className="text-2xl leading-none">{getTeamFlag(team)}</span>
-      {align === 'left' && <span className="font-bold">{team}</span>}
+    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-cyan-400 font-black text-slate-950 shadow ring-2 ring-white/20`}>
+      {code}
+    </div>
+  )
+}
+
+function TeamCard({ team, align = 'left' }: { team: string; align?: 'left' | 'right' }) {
+  return (
+    <div className={`flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 ${align === 'right' ? 'justify-end text-right' : ''}`}>
+      {align === 'left' && <TeamFlag team={team} />}
+      <div className="min-w-0">
+        <p className="truncate text-base font-black text-white">{team}</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-cyan-200">{getTeamCode(team)}</p>
+      </div>
+      {align === 'right' && <TeamFlag team={team} />}
     </div>
   )
 }
@@ -49,6 +78,12 @@ function getStatusLabel(match: Match, isClosed: boolean) {
   if (match.status === 'finished') return 'Finalizado'
   if (isClosed) return 'Cerrado'
   return 'Abierto'
+}
+
+function getStatusClass(label: string) {
+  if (label === 'Abierto') return 'bg-emerald-400/20 text-emerald-100 border-emerald-300/20'
+  if (label === 'Finalizado') return 'bg-blue-400/20 text-blue-100 border-blue-300/20'
+  return 'bg-amber-400/20 text-amber-100 border-amber-300/20'
 }
 
 export default function FixturePage() {
@@ -202,7 +237,7 @@ export default function FixturePage() {
       return
     }
 
-    setMessage(`Pronóstico guardado: ${getTeamFlag(match.home_team)} ${match.home_team} ${home} - ${away} ${getTeamFlag(match.away_team)} ${match.away_team}`)
+    setMessage(`Pronóstico guardado: ${match.home_team} ${home} - ${away} ${match.away_team}`)
     setSavingMatchId(null)
     await loadData()
   }
@@ -215,7 +250,7 @@ export default function FixturePage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-10">
-        <div className="rounded-3xl border border-white/10 bg-white/10 p-6">
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-white">
           Cargando fixture...
         </div>
       </main>
@@ -223,45 +258,52 @@ export default function FixturePage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <section className="mb-6 rounded-3xl border border-white/10 bg-gradient-to-br from-blue-900/70 to-slate-900/80 p-6 shadow-2xl">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-cyan-300">
-              Mundial 2026
-            </p>
-            <h1 className="text-3xl font-black text-white md:text-5xl">Fixture</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-200 md:text-base">
-              Ingresa tus pronósticos antes del inicio de cada partido. Las tarjetas están agrupadas por grupo para que sea más fácil jugar desde el celular.
-            </p>
-          </div>
+    <main className="mx-auto max-w-7xl px-4 py-8">
+      <section className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-blue-900/80 via-slate-900 to-slate-950 shadow-2xl">
+        <div className="relative p-6 md:p-8">
+          <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-blue-500/20 blur-3xl" />
 
-          <button
-            onClick={logout}
-            className="rounded-xl border border-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/10"
-          >
-            Salir
-          </button>
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="mb-2 text-xs font-black uppercase tracking-[0.25em] text-cyan-300">
+                Mundial 2026
+              </p>
+              <h1 className="text-4xl font-black tracking-tight text-white md:text-6xl">
+                Fixture
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm text-slate-200 md:text-base">
+                Ingresa tus marcadores antes del inicio de cada partido. Los encuentros están agrupados por grupo y muestran banderas reales.
+              </p>
+            </div>
+
+            <button
+              onClick={logout}
+              className="rounded-2xl border border-white/20 px-5 py-3 text-sm font-bold text-white hover:bg-white/10"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </section>
 
       {message && (
-        <div className="mb-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-50">
+        <div className="mb-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">
           {message}
         </div>
       )}
 
       {Object.entries(groupedMatches).map(([groupName, groupMatches]) => (
-        <section key={groupName} className="mb-8">
-          <div className="mb-4 flex items-center gap-3">
+        <section key={groupName} className="mb-10">
+          <div className="mb-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-white/10" />
-            <h2 className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-5 py-2 text-center text-sm font-black uppercase tracking-widest text-cyan-100">
+            <h2 className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-6 py-2 text-center text-sm font-black uppercase tracking-[0.2em] text-cyan-100 shadow-lg">
               {groupName}
             </h2>
             <div className="h-px flex-1 bg-white/10" />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 lg:grid-cols-2">
             {groupMatches.map((match) => {
               const matchDate = new Date(match.match_datetime)
               const isClosed = match.status !== 'open' || new Date() >= matchDate
@@ -271,66 +313,60 @@ export default function FixturePage() {
               return (
                 <article
                   key={match.id}
-                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/10 shadow-xl"
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-xl ring-1 ring-white/5"
                 >
-                  <div className="border-b border-white/10 bg-blue-950/60 px-5 py-4">
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="border-b border-white/10 bg-gradient-to-r from-blue-950/90 to-slate-900 px-5 py-4">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
                           Partido #{match.match_number}
                         </p>
-                        <p className="mt-1 text-sm text-slate-200">
-                          {match.stage} · {matchDate.toLocaleDateString()} · {matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {matchDate.toLocaleDateString()} · {matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {match.stage}
+                          {match.venue ? ` · ${match.venue}` : ''}
                         </p>
                       </div>
 
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          statusLabel === 'Abierto'
-                            ? 'bg-emerald-400/20 text-emerald-100'
-                            : statusLabel === 'Finalizado'
-                              ? 'bg-blue-400/20 text-blue-100'
-                              : 'bg-amber-400/20 text-amber-100'
-                        }`}
-                      >
+                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${getStatusClass(statusLabel)}`}>
                         {statusLabel}
                       </span>
                     </div>
-
-                    {match.venue && (
-                      <p className="mt-2 text-xs text-slate-400">
-                        Sede: {match.venue}
-                      </p>
-                    )}
                   </div>
 
                   <div className="p-5">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                      <TeamPill team={match.home_team} align="right" />
-                      <div className="rounded-full bg-cyan-400 px-3 py-1 text-sm font-black text-slate-950">
+                      <TeamCard team={match.home_team} align="right" />
+
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-400 text-sm font-black text-slate-950 shadow-lg">
                         VS
                       </div>
-                      <TeamPill team={match.away_team} align="left" />
+
+                      <TeamCard team={match.away_team} align="left" />
                     </div>
 
                     {match.status === 'finished' && match.home_score !== null && match.away_score !== null && (
-                      <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-3 text-center">
-                        <p className="text-xs uppercase tracking-widest text-slate-400">Resultado real</p>
-                        <p className="text-2xl font-black text-white">
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-white/10 p-4 text-center">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+                          Resultado real
+                        </p>
+                        <p className="mt-1 text-3xl font-black text-white">
                           {match.home_score} - {match.away_score}
                         </p>
                       </div>
                     )}
 
-                    <div className="mt-5">
-                      <p className="mb-2 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
+                    <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                      <p className="mb-3 text-center text-xs font-black uppercase tracking-[0.25em] text-cyan-200">
                         Tu pronóstico
                       </p>
 
                       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                         <input
                           disabled={isClosed}
-                          className="w-full rounded-xl p-3 text-center text-lg font-black"
+                          className="w-full rounded-2xl p-4 text-center text-xl font-black"
                           type="number"
                           min="0"
                           placeholder="0"
@@ -340,7 +376,7 @@ export default function FixturePage() {
                         <span className="text-xl font-black text-white">-</span>
                         <input
                           disabled={isClosed}
-                          className="w-full rounded-xl p-3 text-center text-lg font-black"
+                          className="w-full rounded-2xl p-4 text-center text-xl font-black"
                           type="number"
                           min="0"
                           placeholder="0"
@@ -353,14 +389,14 @@ export default function FixturePage() {
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm text-slate-300">
                         {pred
-                          ? `Guardado: ${getTeamFlag(match.home_team)} ${pred.predicted_home_score} - ${pred.predicted_away_score} ${getTeamFlag(match.away_team)} · Puntos: ${pred.points}`
+                          ? `Guardado: ${pred.predicted_home_score} - ${pred.predicted_away_score} · Puntos: ${pred.points}`
                           : 'Sin pronóstico'}
                       </p>
 
                       <button
                         disabled={isClosed || savingMatchId === match.id}
                         onClick={() => savePrediction(match)}
-                        className="rounded-xl bg-cyan-400 px-5 py-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-500"
+                        className="rounded-2xl bg-cyan-400 px-6 py-3 font-black text-slate-950 shadow-lg hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-500"
                       >
                         {savingMatchId === match.id ? 'Guardando...' : isClosed ? 'Cerrado' : 'Guardar'}
                       </button>
