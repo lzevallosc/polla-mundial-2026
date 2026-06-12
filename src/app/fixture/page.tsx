@@ -352,10 +352,27 @@ export default function FixturePage() {
   }, [matches, activeFilter, activeMonthFilter, activeDayFilter, searchText])
 
   const groupedMatches = useMemo(() => {
-    return filteredMatches.reduce<Record<string, Match[]>>((groups, match) => {
+    const sortedMatches = [...filteredMatches].sort((a, b) => {
+      const dateDiff =
+        new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime()
+
+      if (dateDiff !== 0) return dateDiff
+
+      return a.match_number - b.match_number
+    })
+
+    return sortedMatches.reduce<Record<string, Match[]>>((groups, match) => {
       const key = match.group_name || match.stage || 'Otros'
       if (!groups[key]) groups[key] = []
       groups[key].push(match)
+      groups[key].sort((a, b) => {
+        const dateDiff =
+          new Date(a.match_datetime).getTime() - new Date(b.match_datetime).getTime()
+
+        if (dateDiff !== 0) return dateDiff
+
+        return a.match_number - b.match_number
+      })
       return groups
     }, {})
   }, [filteredMatches])
