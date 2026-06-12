@@ -517,16 +517,26 @@ export async function GET(request: NextRequest) {
       updatePayload.status = 'finished'
     }
 
-    const { error: updateError } = await supabaseAdmin
+    const { data: updatedRows, error: updateError } = await supabaseAdmin
       .from('matches')
       .update(updatePayload)
       .eq('id', localMatch.id)
+      .select('id, match_number, home_team, away_team, status, home_score, away_score, api_synced_at')
 
     if (updateError) {
       summary.skipped.push({
-        apiMatchId: apiMatch.id,
         localMatchId: localMatch.id,
+        apiMatchId: apiMatch.id,
         reason: updateError.message,
+      })
+      continue
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      summary.skipped.push({
+        localMatchId: localMatch.id,
+        apiMatchId: apiMatch.id,
+        reason: 'Update ejecutado pero Supabase no devolvió filas actualizadas.',
       })
       continue
     }
