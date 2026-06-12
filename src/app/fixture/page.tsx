@@ -42,6 +42,56 @@ type ScoreDraft = {
   away: string
 }
 
+
+const LIMA_TIME_ZONE = 'America/Lima'
+
+function getLimaParts(dateValue: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: LIMA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(dateValue))
+
+  const year = parts.find((part) => part.type === 'year')?.value || ''
+  const month = parts.find((part) => part.type === 'month')?.value || ''
+  const day = parts.find((part) => part.type === 'day')?.value || ''
+
+  return { year, month, day }
+}
+
+function getLimaDateKey(dateValue: string) {
+  const { year, month, day } = getLimaParts(dateValue)
+  return `${year}-${month}-${day}`
+}
+
+function getLimaMonthKey(dateValue: string) {
+  const { year, month } = getLimaParts(dateValue)
+  return `${year}-${month}`
+}
+
+function formatLimaDateLabel(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+
+  return new Intl.DateTimeFormat('es-PE', {
+    timeZone: LIMA_TIME_ZONE,
+    weekday: 'short',
+    day: '2-digit',
+    month: 'long',
+  }).format(new Date(Date.UTC(year, month - 1, day, 12, 0, 0)))
+}
+
+function formatLimaMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number)
+
+  return new Intl.DateTimeFormat('es-PE', {
+    timeZone: LIMA_TIME_ZONE,
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(year, month - 1, 1, 12, 0, 0)))
+}
+
+
 function TeamFlag({ team, size = 'md' }: { team: string; size?: 'sm' | 'md' | 'lg' }) {
   const flagUrl = getTeamFlagUrl(team)
   const code = getTeamCode(team)
@@ -195,34 +245,23 @@ export default function FixturePage() {
   }
 
   function getMatchDayKey(dateValue: string) {
-    return dateValue.slice(0, 10)
+    return getLimaDateKey(dateValue)
   }
 
-  function getMatchDayLabel(dateValue: string) {
-    const [year, month, day] = dateValue.slice(0, 10).split('-').map(Number)
-    const date = new Date(year, month - 1, day)
+  function getMatchDayLabel(dateValueOrKey: string) {
+    const dateKey = /^\d{4}-\d{2}-\d{2}$/.test(dateValueOrKey)
+      ? dateValueOrKey
+      : getLimaDateKey(dateValueOrKey)
 
-    return new Intl.DateTimeFormat('es-PE', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }).format(date)
+    return formatLimaDateLabel(dateKey)
   }
 
   function getMatchMonthKey(dateValue: string) {
-    const date = new Date(dateValue)
-    return date.toISOString().slice(0, 7)
+    return getLimaMonthKey(dateValue)
   }
 
   function getMatchMonthLabel(monthKey: string) {
-    const [year, month] = monthKey.split('-').map(Number)
-    const date = new Date(year, month - 1, 1)
-
-    return new Intl.DateTimeFormat('es-PE', {
-      month: 'long',
-      year: 'numeric',
-    }).format(date)
+    return formatLimaMonthLabel(monthKey)
   }
 
   function normalizeText(value: string | null | undefined) {
@@ -846,7 +885,7 @@ export default function FixturePage() {
                           Partido #{match.match_number}
                         </p>
                         <p className="mt-1 text-sm font-semibold text-white">
-                          {matchDate.toLocaleDateString('es-PE')} · {matchDate.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                          {matchDate.toLocaleDateString('es-PE', { timeZone: LIMA_TIME_ZONE })} · {matchDate.toLocaleTimeString('es-PE', { timeZone: LIMA_TIME_ZONE, hour: '2-digit', minute: '2-digit' })}
                         </p>
                         <p className="mt-1 text-xs text-slate-400">
                           {match.stage}
